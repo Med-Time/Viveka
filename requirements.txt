@@ -1,0 +1,8 @@
+langchain
+langgraph
+langchain-openai
+langchain-anthropic
+langchain-groq
+tqdm
+python-dotenv
+langchain[google-vertexai]
