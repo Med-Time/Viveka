@@ -7,3 +7,7 @@ env
 Issues.txt
 *.log
 senv
+input.txt
+*.png
+*.mmd
+mainq.py

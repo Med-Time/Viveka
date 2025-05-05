@@ -1,8 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from models.schemas import InterviewStartInput, AnswerInput
-#from ..langraph_flow.interview_graph import interview_graph
-from langraph_flow.interview_graph import interview_graph
-#from ..langgraph_flow.interview_graph import interview_graph
+from langraph_flow.interview_graph import initial_question_graph, answer_loop_graph
 from services.session_state import init_state, load_state, save_state
 from services.mongo_persistence import (
     create_interview_session,
@@ -10,11 +8,7 @@ from services.mongo_persistence import (
     save_persona,
 )
 
-
-#from server.interview_module
-# from .langgraph_flow.interview_graph import interview_graph
 router = APIRouter()
-
 
 @router.post("/interview/start")
 def start_interview(data: InterviewStartInput):
@@ -29,18 +23,34 @@ def start_interview(data: InterviewStartInput):
     # Create LangGraph state
     state = init_state(data)
     state["session_id"] = session_id
-
-    # Start LangGraph
-    result = interview_graph.invoke(state)
-    updated_state = result["state"]
-
+    
+    # Use initial_question_graph to just get curriculum and first question
+    result = initial_question_graph.invoke(state)
+    
+    # Process the result
+    if isinstance(result, dict) and "state" in result:
+        updated_state = result["state"]
+    elif hasattr(result, "state"):
+        updated_state = result.state
+    else:
+        updated_state = result
+    
     # Save session state
     save_state(data.user_id, updated_state)
-
+    
+    # Check if curriculum exists and has content
+    if not updated_state.get("curriculum") or len(updated_state["curriculum"]) == 0:
+        return {
+            "status": "error",
+            "message": "No curriculum was generated. Please try again.",
+            "session_id": session_id
+        }
+    
+    # Return the first question
     return {
         "status": "ok",
         "question": updated_state["current_question"],
-        "concept": updated_state["curriculum"][updated_state["current_concept_index"]],
+        "concept": updated_state["curriculum"][0],  # Always first concept
         "session_id": session_id,
     }
 
@@ -55,10 +65,18 @@ def answer_question(data: AnswerInput):
     # Add user answer
     state["answer"] = data.answer
     concept = state["curriculum"][state["current_concept_index"]]
-
-    # Resume LangGraph
-    result = interview_graph.invoke(state)
-    updated_state = result["state"]
+    
+    # Use answer_loop_graph which starts from scoring
+    result = answer_loop_graph.invoke(state)
+    
+    # Process result
+    if isinstance(result, dict) and "state" in result:
+        updated_state = result["state"]
+    elif hasattr(result, "state"):
+        updated_state = result.state
+    else:
+        updated_state = result
+        
     save_state(data.user_id, updated_state)
 
     # Save Q/A to MongoDB
