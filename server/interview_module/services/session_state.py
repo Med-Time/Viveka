@@ -14,7 +14,8 @@ def init_state(data):
         "score_history": [],
         "retry_count": 0,
         "use_rag": False,
-        "done": False
+        "done": False,
+        "feedback_history": [],
     }
 
 def save_state(user_id, state):

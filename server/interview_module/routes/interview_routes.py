@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from models.schemas import InterviewStartInput, AnswerInput
-from langraph_flow.interview_graph import initial_question_graph, answer_loop_graph
-from services.session_state import init_state, load_state, save_state
-from services.mongo_persistence import (
+from interview_module.models.schemas import InterviewStartInput, AnswerInput
+from interview_module.langraph_flow.interview_graph import initial_question_graph, answer_loop_graph
+from interview_module.services.session_state import init_state, load_state, save_state
+from interview_module.services.mongo_persistence import (
     create_interview_session,
     save_qa,
     save_persona,
@@ -83,6 +83,7 @@ def answer_question(data: AnswerInput):
     save_qa(
         session_id=updated_state["session_id"],
         concept=concept,
+        feedback=updated_state["feedback_history"],
         question=updated_state["current_question"],
         answer=updated_state["answer"],
         score=updated_state["score_history"][-1],
@@ -92,7 +93,7 @@ def answer_question(data: AnswerInput):
     # If finished, save persona report and return summary
     if updated_state.get("done", False):
         save_persona(
-            user_id=updated_state["user_id"],
+            session_id=updated_state["user_id"],
             report_text=updated_state.get("persona_summary", ""),
             type="interview"
         )

@@ -20,6 +20,7 @@ variation_prompts = {
 }
 class QuestionResponse(BaseModel):
     question: str = Field(..., description="LLM-generated interview question for current concept it might be detailed_answer, one_word_answer, mcq, or fill_in_the_blanks")
+    question_type: str = Field(..., description="The type of question generated (e.g., 'mcq', 'detailed_answer', 'one_word_answer', 'fill_in_the_blanks')")
 structured_llm = llm.with_structured_output(QuestionResponse)
 def generate_question_llm(state):
     variation = random.choice(question_variations)
@@ -41,6 +42,7 @@ def generate_question_llm(state):
         """
     question = structured_llm.invoke(prompt)
     state.current_question = question.question
+    state.current_question_type = variation
     print(f"Question: {question.question}")
     # state.current_question = question
     return state

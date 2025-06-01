@@ -1,12 +1,12 @@
 from langgraph.graph import StateGraph, END
-from langraph_flow.nodes.curriculum_llm import generate_curriculum_llm
-from langraph_flow.nodes.curriculum_rag import generate_curriculum_rag
-from langraph_flow.nodes.check_docs import check_docs
-from langraph_flow.nodes.rag_question import generate_question_rag
-from langraph_flow.nodes.llm_question import generate_question_llm
-from langraph_flow.nodes.score import score_answer
-from langraph_flow.nodes.decide import decide_next
-from langraph_flow.nodes.persona import run_persona
+from interview_module.langraph_flow.nodes.curriculum_llm import generate_curriculum_llm
+from interview_module.langraph_flow.nodes.curriculum_rag import generate_curriculum_rag
+from interview_module.langraph_flow.nodes.check_docs import check_docs
+from interview_module.langraph_flow.nodes.rag_question import generate_question_rag
+from interview_module.langraph_flow.nodes.llm_question import generate_question_llm
+from interview_module.langraph_flow.nodes.score import score_answer
+from interview_module.langraph_flow.nodes.decide import decide_next
+from interview_module.langraph_flow.nodes.persona import run_persona
 
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -22,6 +22,8 @@ class InterviewState(BaseModel):
     question_history: List[str] = Field(default_factory=list)
     answer_history: List[str] = Field(default_factory=list)
     answer: Optional[str] = None
+    feedback_history: List[str] = Field(default_factory=list)  # Add this line
+    current_question_type: Optional[str] = None  
     score_history: List[int] = Field(default_factory=list)
     retry_count: int = 0
     use_rag: bool = False
