@@ -1,4 +1,4 @@
-from core.vector_Store import search_similar_chunks
+from interview_module.core.vector_Store import search_similar_chunks
 from langchain_google_genai import ChatGoogleGenerativeAI
 import random
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
@@ -18,6 +18,7 @@ variation_prompts = {
     "fill_in_the_blanks": "Please generate a fill-in-the-blanks question."
 }
 class QuestionResponse(BaseModel):
+    question_type: str = Field(..., description="The type of question generated (e.g., 'mcq', 'detailed_answer', 'one_word_answer', 'fill_in_the_blanks')")
     question: str = Field(..., description="LLM-generated interview question for current concept it might be detailed_answer, one_word_answer, mcq, or fill_in_the_blanks")
 structured_llm = llm.with_structured_output(QuestionResponse)
 def generate_question_rag(state):
@@ -60,6 +61,7 @@ def generate_question_rag(state):
 
     response= structured_llm.invoke(prompt)
     print(response)
+    state.current_question_type = variation
     print(response.question)
     state.current_question = response.question
     return state

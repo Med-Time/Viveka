@@ -26,15 +26,9 @@ Retry count for this concept: {retry_count}
 Concept index: {current_index} / {total_concepts}
 
 Rules:
-- If score ≥ 60 and retry_count < 3 → Move to next concept.
-- If score < 60 and retry_count < 3 → Retry same concept.
+- If score ≥ 50 and retry_count < 3 → Move to next concept.
+- If score < 50 and retry_count < 3 → Retry same concept.
 - If retry_count ≥ 3 → Move to next concept anyway.
-
-Return in this exact JSON:
-{{
-  "action": "retry" | "next" | "end",
-  "reason": "..."  # short explanation
-}}
 """)
 
 
