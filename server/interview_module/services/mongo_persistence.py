@@ -1,6 +1,6 @@
 from interview_module.core.mongo import sessions_col, qa_col, persona_col
 from datetime import datetime
-#from bson import ObjectId
+from bson import ObjectId
 
 def create_interview_session(user_id, subject, goal, level,curriculum=None):
     session = {

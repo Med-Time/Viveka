@@ -23,7 +23,7 @@ def generate_curriculum_llm(state):
     Their current estimated proficiency level is: **{level}**.
 
     **Your Task:**
-    Generate a list of 5 to 7 core concepts that will form the initial, personalized learning roadmap for this student. These concepts will be used to conduct an interview and subsequently generate a detailed lesson plan.
+    Generate a list of 2 to 3 core concepts that will form the initial, personalized learning roadmap for this student. These concepts will be used to conduct an interview and subsequently generate a detailed lesson plan.
 
     **Strict Requirements & Guidelines:**
     1.  **Personalization:** The concepts MUST directly align with the user's explicit `{goal}` and `{level}`.

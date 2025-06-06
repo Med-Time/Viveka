@@ -95,12 +95,15 @@ def answer_question(data: AnswerInput):
         save_persona(
             session_id=updated_state["user_id"],
             report_text=updated_state.get("persona_summary", ""),
-            type="interview"
+            type="interview",
+            #feedback=updated_state["feedback_history"],
         )
         return {
             "status": "done",
             "final_score": sum(updated_state["score_history"]) // len(updated_state["score_history"]),
-            "summary": updated_state.get("persona_summary", "")
+            "summary": updated_state.get("persona_summary", ""),
+            "feedback": updated_state.get("feedback_history")
+
         }
 
     # Else, return next question
