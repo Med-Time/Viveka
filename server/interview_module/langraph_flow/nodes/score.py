@@ -118,7 +118,7 @@ def score_answer(state):
 
     ---
     **Question Type Specific Instructions:**
-    Question Type: {question_type.upper()}
+    Question Type: {question_type}
     {scoring_instruction_for_llm}
     ---
 

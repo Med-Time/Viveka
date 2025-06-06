@@ -45,7 +45,7 @@ def generate_curriculum_rag(state):
     {chunks}
 
     **Your Task:**
-    Based *only* on the provided `Relevant Learning Materials` and the learner's subject, goal, and level, generate a list of 5 to 7 core concepts. These concepts will form the initial, personalized learning roadmap for this student, to be used for an interview and subsequent detailed lesson plan generation.
+    Based *only* on the provided `Relevant Learning Materials` and the learner's subject, goal, and level, generate a list of 2 to 3 core concepts. These concepts will form the initial, personalized learning roadmap for this student, to be used for an interview and subsequent detailed lesson plan generation.
 
     **Strict Requirements & Guidelines:**
     1.  **Material-Grounded:** All concepts MUST be directly derivable and supported by the information present in the `Relevant Learning Materials`. Do not invent concepts not covered in the provided chunks.

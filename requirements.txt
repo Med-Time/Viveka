@@ -7,3 +7,4 @@ uvicorn[standard]
 pymongo
 qdrant-client
 pymupdf
+langchain_huggingface
