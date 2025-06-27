@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { LessonPlanResponse } from './types/api';
-import { fetchLessonPlan } from './api/lessonPlan';
+import type { LessonPlanResponse } from '../types/api';
+import { fetchLessonPlan } from '../api/lessonPlan';
 
 const ChevronDown = () => (
   <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -13,12 +13,11 @@ const ChevronUp = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
   </svg>
 );
-
-const LessonPlan: React.FC = () => {
+export function LessonPlan(){
   const [lessonPlan, setLessonPlan] = useState<LessonPlanResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetchLessonPlan('abc123')
@@ -55,28 +54,50 @@ const LessonPlan: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
-      <h1 className="text-3xl font-bold mb-1">Lesson Plan</h1>
+      <div className="flex justify-between items-center mb-4">
+        <span className="text-lg font-semibold text-1200">{lesson_plan.subject_name}</span>
+        <span className="text-sm text-green-600">{lesson_plan.total_module_time_hours} hours</span>
+      </div>
       <p className="text-sm text-blue-500 mb-6 cursor-pointer hover:underline">
         {lesson_plan.overall_course_outcome}
       </p>
-      <div className="bg-red-500 text-white p-4">If this is red, Tailwind works!</div>
+
+      
+
+      {lesson_plan.prerequisites && lesson_plan.prerequisites.length > 0 && (
+        <div className="mb-6">
+          <span className="block font-medium text-700 mb-1">Prerequisites:</span>
+          <ul className="list-disc ml-6 text-700 text-sm">
+            {lesson_plan.prerequisites.map((prereq, idx) => (
+              <li key={idx}>{prereq}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="space-y-4">
         {lesson_plan.chapters.map((chapter, i) => (
           <div key={i}>
             <button
               className="flex w-full items-center justify-between py-4 focus:outline-none"
-              onClick={() => setExpanded(expanded === i ? null : i)}
-              aria-expanded={expanded === i ? 'true' : 'false'}
+              onClick={() => {
+                const newSet = new Set(expanded);
+                if (newSet.has(i)) {
+                  newSet.delete(i);
+                } else {
+                  newSet.add(i);
+                }
+                setExpanded(newSet);
+              }}
             >
               <div className="flex flex-col items-start text-left">
-                <span className="text-base font-semibold text-black">{chapter.chapter_title}</span>
+                <span className="text-base font-semibold">{chapter.chapter_title}</span>
                 <span className="text-sm text-gray-400">{chapter.chapter_total_time_minutes} min</span>
               </div>
-              <span>{expanded === i ? <ChevronUp /> : <ChevronDown />}</span>
+              <span>{expanded.has(i) ? <ChevronUp /> : <ChevronDown />}</span>
             </button>
 
-            {expanded === i && (
+            {expanded.has(i) && (
               <div className="ml-1 px-6 pb-6 pt-1 bg-white text-sm text-gray-800 animate-fade-in">
                 <div className="mb-2">
                   <span className="block font-medium text-gray-700">Learning Outcome:</span>
@@ -85,11 +106,14 @@ const LessonPlan: React.FC = () => {
                 {chapter.sub_topics?.length > 0 && (
                   <div>
                     <span className="block font-medium text-gray-700">Subtopics:</span>
-                    <ul className="list-disc ml-5">
+                    <ul className="ml-5">
                       {chapter.sub_topics.map((sub, j) => (
-                        <li key={j} className="mb-1">
-                          <span className="font-semibold">{sub.sub_topic_title}:</span> {sub.sub_topic_outcome}{' '}
-                          <span className="text-xs text-gray-500">({sub.estimated_time_minutes} min)</span>
+                        <li key={j} className="mb-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">{sub.sub_topic_title}</span>
+                            <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">{sub.estimated_time_minutes} min</span>
+                          </div>
+                          <div className="text-sm text-gray-600 ml-1">{sub.sub_topic_outcome}</div>
                         </li>
                       ))}
                     </ul>
@@ -102,6 +126,4 @@ const LessonPlan: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default LessonPlan;
+}
