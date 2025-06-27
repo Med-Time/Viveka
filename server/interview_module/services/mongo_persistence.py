@@ -1,4 +1,4 @@
-from interview_module.core.mongo import sessions_col, qa_col, persona_col
+from interview_module.core.mongo import sessions_col, qa_col, persona_col, lesson_plan
 from datetime import datetime
 from bson import ObjectId
 
@@ -63,4 +63,39 @@ def save_curriculum(session_id, curriculum_list):
         {"$set": {"curriculum": curriculum_list}}
     )
     print(f"Curriculum saved for session {session_id}")
+
+def save_lesson_plan(session_id, lesson_plan_data):
+    """
+    Saves the generated lesson plan and associated data.
+    """
+    try:
+        # Create a new document for the lesson plan
+        lesson_plan_doc = {
+            "session_id": session_id,
+            "created_at": datetime.utcnow()
+        }
+        
+        # Add all the data from lesson_plan_data
+        lesson_plan_doc.update(lesson_plan_data)
+        
+        # Get the correct collection - use lesson_plans (plural)
+        lesson_plans_col = sessions_col.database.lesson_plans
+        
+        # Check if a lesson plan for this session already exists
+        existing_plan = lesson_plans_col.find_one({"session_id": session_id})
+        
+        if existing_plan:
+            # Update existing plan
+            result = lesson_plans_col.update_one(
+                {"session_id": session_id},
+                {"$set": lesson_plan_doc}
+            )
+            return str(existing_plan["_id"])
+        else:
+            # Insert new plan
+            result = lesson_plans_col.insert_one(lesson_plan_doc)
+            return str(result.inserted_id)
+    except Exception as e:
+        print(f"Exception in save_lesson_plan: {str(e)}")
+        raise
 

@@ -19,3 +19,4 @@ db = client["interview_ai"]  # Your MongoDB database name
 sessions_col = db["interview_sessions"]
 qa_col = db["qa_history"]
 persona_col = db["persona_reports"]
+lesson_plan = db["lesson_plans"]

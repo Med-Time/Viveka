@@ -74,3 +74,23 @@ def fetch_all_session_data(session_id: str, user_id: str):
         "feedback_history": feedback_history,
         "persona_summary": persona_summary
     }
+
+def fetch_lesson_plan(session_id: str):
+    """
+    Fetches the saved lesson plan for a given session ID.
+    """
+    # Get the lesson_plans collection (use plural)
+    lesson_plans_col = sessions_col.database.lesson_plans
+    
+    # Find the lesson plan for this session
+    lesson_plan = lesson_plans_col.find_one({"session_id": session_id})
+    
+    if lesson_plan:
+        # Convert ObjectId to string for JSON serialization
+        lesson_plan["_id"] = str(lesson_plan["_id"])
+        
+        # Convert datetime objects to strings
+        if "created_at" in lesson_plan:
+            lesson_plan["created_at"] = lesson_plan["created_at"].isoformat()
+            
+    return lesson_plan
