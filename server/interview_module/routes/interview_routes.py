@@ -30,8 +30,8 @@ def start_interview(data: InterviewStartInput):
     # Process the result
     if isinstance(result, dict) and "state" in result:
         updated_state = result["state"]
-    elif hasattr(result, "state"):
-        updated_state = result.state
+    # elif hasattr(result, "state"):
+    #     updated_state = result.state
     else:
         updated_state = result
     
@@ -72,8 +72,8 @@ def answer_question(data: AnswerInput):
     # Process result
     if isinstance(result, dict) and "state" in result:
         updated_state = result["state"]
-    elif hasattr(result, "state"):
-        updated_state = result.state
+    # elif hasattr(result, "state"):
+    #     updated_state = result.state
     else:
         updated_state = result
         
