@@ -20,8 +20,9 @@ export function LessonPlan(){
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    fetchLessonPlan('abc123')
+    fetchLessonPlan('685e9991a498755fc45f227d')
       .then((data) => {
+        console.log(data);
         setLessonPlan(data);
         setLoading(false);
       })
@@ -58,7 +59,7 @@ export function LessonPlan(){
         <span className="text-lg font-semibold text-1200">{lesson_plan.subject_name}</span>
         <span className="text-sm text-green-600">{lesson_plan.total_module_time_hours} hours</span>
       </div>
-      <p className="text-sm text-blue-500 mb-6 cursor-pointer hover:underline">
+      <p className="text-sm text-blue-500 mb-6 ">
         {lesson_plan.overall_course_outcome}
       </p>
 
