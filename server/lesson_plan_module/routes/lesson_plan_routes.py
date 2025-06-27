@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from bson import ObjectId
 from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
-from lesson_plan_module.langraph_flow.lesson_plan import generate_lesson_plan ,xlesson_plan_graph
+from lesson_plan_module.langraph_flow.lesson_plan import xlesson_plan_graph
 router = APIRouter(
     prefix="/lesson-plan",
     tags=["lesson-plan"]
@@ -15,7 +15,7 @@ def get_lesson_plans():
 def generate_lesson_plan():
     return {"message": "Lesson plan generation endpoint"}
 
-@router.get("generate/{session_id}")
+@router.get("/generate/{session_id}")
 async def get_lesson_plan(session_id: str):
     # 1. Get session data
     try:
