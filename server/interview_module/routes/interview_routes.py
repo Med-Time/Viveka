@@ -6,7 +6,10 @@ from interview_module.services.mongo_persistence import (
     create_interview_session,
     save_qa,
     save_persona,
+    
 )
+from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
+from bson import ObjectId
 
 router = APIRouter()
 
@@ -113,3 +116,44 @@ def answer_question(data: AnswerInput):
         "concept": updated_state["curriculum"][updated_state["current_concept_index"]],
         "score": updated_state["score_history"][-1]
     }
+
+
+@router.get("/persona/{session_id}")
+def get_persona_report(session_id: str):
+    """
+    Retrieve the persona report for a specific session.
+    
+    Args:
+        session_id: The ID of the session to get the persona report for
+        
+    Returns:
+        The persona report document as JSON
+    """
+    try:
+        # Convert string ID to ObjectId if needed
+        session_obj_id = session_id
+        if ObjectId.is_valid(session_id):
+            session_obj_id = ObjectId(session_id)
+        
+        # Find the most recent persona report for this session
+        persona_report = persona_col.find_one(
+            {"session_id": session_id},
+            sort=[("created_at", -1)]
+        )
+        
+        # Check if persona report exists
+        if not persona_report:
+            raise HTTPException(status_code=404, detail=f"No persona report found for session {session_id}")
+        
+        # Convert ObjectId to string for JSON serialization
+        if "_id" in persona_report:
+            persona_report["_id"] = str(persona_report["_id"])
+            
+        return {
+            "status": "success",
+            "data": persona_report
+        }
+        
+    except Exception as e:
+        # Handle other errors
+        raise HTTPException(status_code=500, detail=f"Error retrieving persona report: {str(e)}")
