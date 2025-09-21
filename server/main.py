@@ -10,6 +10,7 @@ app.include_router(lesson_plan_router)
 origins = [
     "http://localhost:5173",
     # Add more origins here
+    "*",
 ]
 
 
