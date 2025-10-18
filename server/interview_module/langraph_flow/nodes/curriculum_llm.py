@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 from interview_module.services.mongo_persistence import save_curriculum
 load_dotenv()
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 from typing import List

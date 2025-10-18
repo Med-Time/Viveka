@@ -2,7 +2,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 load_dotenv()
 import random
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 from pydantic import BaseModel, Field
 from typing import List
 question_variations = [
@@ -19,8 +19,8 @@ variation_prompts = {
     "fill_in_the_blanks": "Please generate a fill-in-the-blanks question."
 }
 class QuestionResponse(BaseModel):
-    question: str = Field(..., description="LLM-generated interview question for current concept it might be detailed_answer, one_word_answer, mcq, or fill_in_the_blanks")
-    question_type: str = Field(..., description="The type of question generated (e.g., 'mcq', 'detailed_answer', 'one_word_answer', 'fill_in_the_blanks')")
+    question: str = Field(..., description="LLM-generated interview question for current concept it might be detailed_answer, one_word_answer, mcq with options, or fill_in_the_blanks")
+    question_type: str = Field(..., description="The type of question generated (e.g., 'mcq with options', 'detailed_answer', 'one_word_answer', 'fill_in_the_blanks')")
 structured_llm = llm.with_structured_output(QuestionResponse)
 def generate_question_llm(state):
     variation = random.choice(question_variations)

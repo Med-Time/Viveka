@@ -6,7 +6,7 @@ class NextAction(BaseModel):
     action: str = Field(..., description='Action to take: "retry", "next", or "end"')
     reason: str = Field(..., description="Brief explanation for the decision")
 
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 structured_llm = llm.with_structured_output(NextAction)
 
 def decide_next(state):
