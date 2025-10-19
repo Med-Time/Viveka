@@ -1,7 +1,7 @@
 from interview_module.core.vector_Store import search_similar_chunks
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 from pydantic import BaseModel, Field
 
 class RelevanceCheck(BaseModel):

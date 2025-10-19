@@ -147,10 +147,7 @@ async def get_lesson_plan(session_id: str):
                     detail=f"No lesson plan found for session {session_id}. Generate one first."
                 )
         
-        return {
-            "status": "success",
-            "data": lesson_plan
-        }
+        return lesson_plan
         
     except HTTPException:
         raise

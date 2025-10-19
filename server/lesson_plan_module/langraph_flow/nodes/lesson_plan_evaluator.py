@@ -7,7 +7,7 @@ import json
 import re
 
 # Initialize LLM with lower temperature for more consistent evaluations
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1)
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1)
 
 class LessonPlanEvaluation(BaseModel):
     """Structured evaluation of a lesson plan."""
