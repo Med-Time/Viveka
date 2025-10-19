@@ -8,3 +8,4 @@ pymongo
 qdrant-client
 pymupdf
 langchain_huggingface
+sentence-transformers

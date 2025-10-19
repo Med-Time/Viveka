@@ -1,4 +1,5 @@
 import type { Config } from "@react-router/dev/config";
+import About from './app/routes/About';
 
 export default {
   // Config options...

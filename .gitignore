@@ -13,6 +13,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+generated_content/
 
 # Environment variables
 .env
@@ -21,7 +22,7 @@ htmlcov/
 .env.production
 
 # Node.js dependencies
-node_modules/
+# node_modules/
 package-lock.json
 yarn.lock
 npm-debug.log
