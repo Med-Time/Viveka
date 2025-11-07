@@ -18,21 +18,25 @@ def _cache_key(session_id, chapter_title, subtopic_title):
 def fetch_persona_and_lesson(session_id, user_id=None):
     """Fetch persona report and lesson plan from MongoDB for a given session_id (and optional user_id)."""
     # Fetch persona report
+    print(f"Fetching persona for session_id: {session_id}")
     query = {"session_id": session_id}
-    if user_id:
-        query["user_id"] = user_id
+    # if user_id:
+    #     query["user_id"] = user_id
     persona = persona_col.find_one(query)
+    print(f"Persona fetched: {persona}")
     if not persona:
         raise ValueError("Persona report not found for session_id")
-
+    print(f"Fetched persona for session_id: {session_id}")
     # Fetch lesson plan
     lesson_plan = lesson_plans.find_one(query)
     if not lesson_plan:
         raise ValueError("Lesson plan not found for session_id")
+    
+    print(f"Fetched lesson plan for session_id: {session_id}")
 
     # Remove MongoDB's _id field if present
-    # persona.pop("_id", None)
-    # lesson_plan.pop("_id", None)
+    persona.pop("_id", None)
+    lesson_plan.pop("_id", None)
 
     return persona, lesson_plan
 
@@ -44,12 +48,13 @@ def get_subtopics(lesson_plan, chapter_idx=0):
     return subtopics
 
 
-def generate_content(persona, lesson_plan, subtopic, chapter_title):
+def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:None):
     """Generate content using Google Gemini model based on persona, lesson plan, and subtopic."""
-    agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.2)
+    agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2)
+
     prompt = f"""
         You are an expert educational content creator. 
-        Your task is to generate highly detailed, goal-focused study material for a student based on their persona, lesson plan and level.
+        Your task is to generate highly detailed, goal-focused study material for a student based on their persona, lesson plan and level of the learner.
 
         Goal: {lesson_plan['goal']}
         Level: {lesson_plan['level']}
@@ -69,7 +74,7 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title):
         --- Subtopic to Cover ---
         Title: {subtopic['sub_topic_title']}
         Expected Outcome: {subtopic['sub_topic_outcome']}
-        Estimated Study Time: {subtopic['estimated_time_minutes']['$numberInt']} minutes
+        Estimated Study Time: {subtopic['estimated_time_minutes']} minutes
 
         --- Instructions for Content Creation ---
         1. **Content Style**
@@ -96,12 +101,116 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title):
         - Use bullet points, numbered lists, and tables where appropriate.
         - Keep it easy to read and revision-friendly.
 
+        If Feedback is available you must follow feedback.
+        {feedback}
+
         --- Task ---
         Now, generate the full content for this subtopic based on the above instructions.
         """
-
+    print(f"Prompt for content generation: {prompt}")
     return agent.invoke(prompt).content
 
+
+# def regenerate_content_node(state):
+#     """
+#     Regenerate only subtopics that the evaluator marked for revision.
+#     Uses REGEN_PROMPT_TEMPLATE to ask the LLM to revise original content based on evaluator feedback.
+#     Preserves unchanged subtopics, writes regenerated content via store_generated_content, and updates state.
+#     """
+#     print(f"[Regenerator] Regenerating content chapter: {getattr(state, 'chapter_idx', 'unknown')}")
+#     # Prompt template used when regenerating a subtopic using evaluator feedback.
+#     REGEN_PROMPT_TEMPLATE = """
+#     You are an expert instructional designer writing learner-facing instructional content for a specific learner persona.
+#     Revise the ORIGINAL CONTENT below to address the EVALUATOR FEEDBACK while preserving any correct or useful parts.
+#     Do not remove correct content; improve clarity, accuracy, depth, and alignment with the persona.
+
+#     Context:
+#     - Learner Persona Summary:
+#     {persona_summary}
+
+#     - Lesson / Chapter:
+#     {chapter_title}
+#     - Subtopic:
+#     {subtopic_title}
+
+#     --- ORIGINAL CONTENT ---
+#     {original_content}
+
+#     --- EVALUATOR FEEDBACK ---
+#     {feedback}
+
+#     Instructions for the revised content:
+#     1. Address each point in the feedback specifically and thoroughly.
+#     2. Where the feedback asks for more depth or examples, add a minimal, concrete worked example and one brief real-world analogy.
+#     3. For clarity issues, simplify sentences and add a one-line "Why this matters" in the Introduction.
+#     4. For accuracy issues, correct the factual error and add a one-sentence source note if the content relies on a common fact.
+#     5. For alignment issues, include one small activity or tip tailored to the persona's learning style.
+
+#     Produce the revised subtopic content now.
+#     """
+#     for sub in subtopics:
+#         subtopic_title = sub["sub_topic_title"]
+#         print(f"[Regenerator] → Checking subtopic: {subtopic_title}")
+
+#         # Determine whether to regenerate: evaluator flagged suggestions OR low score
+#         should_regen = False
+#         feedback_text = None
+#         if getattr(state, "content_evaluations", None):
+#             eval_entry = state.content_evaluations.get(subtopic_title) if isinstance(state.content_evaluations, dict) else None
+#             if eval_entry:
+#                 # treat suggestions or low score as trigger
+#                 suggestions = eval_entry.get("suggestions") or eval_entry.get("comments")
+#                 score = eval_entry.get("score")
+#                 if suggestions:
+#                     should_regen = True
+#                     feedback_text = suggestions
+#                 elif isinstance(score, (int, float)) and score < 7:
+#                     should_regen = True
+#                     feedback_text = eval_entry.get("comments") or "Evaluator requested improvement."
+
+#         # If no regen required, try cache or reuse previous
+#         if not should_regen:
+#             cached = get_cached_content(state.session_id, chapter_title, subtopic_title)
+#             if cached:
+#                 print(f"[Regenerator] Using cached content for {subtopic_title}")
+#                 new_generated[subtopic_title] = cached
+#                 continue
+#             # fallback to previous generated content
+#             if prev_generated.get(subtopic_title):
+#                 print(f"[Regenerator] Re-using previous content for {subtopic_title}")
+#                 new_generated[subtopic_title] = prev_generated[subtopic_title]
+#                 continue
+
+#         # Prepare regen prompt
+#         original_content = prev_generated.get(subtopic_title, "")
+#         feedback_for_prompt = feedback_text or ""
+#         regen_prompt = REGEN_PROMPT_TEMPLATE.format(
+#             persona_summary=persona_summary + ("\nLearning Style: " + learning_style if learning_style else ""),
+#             chapter_title=chapter_title,
+#             subtopic_title=subtopic_title,
+#             original_content=original_content,
+#             feedback=feedback_for_prompt,
+#         )
+
+#         print(f"[Regenerator] 🔁 Regenerating {subtopic_title} with feedback.")
+#         resp = agent.invoke(regen_prompt)
+#         content = getattr(resp, "content", resp)
+
+#         # Persist regenerated content
+#         try:
+#             store_generated_content(state.session_id, chapter_title, subtopic_title, content)
+#         except Exception as e:
+#             print(f"[Regenerator] Warning: failed to store regenerated content for {subtopic_title}: {e}")
+
+#         new_generated[subtopic_title] = content
+
+#     # Update state
+#     state.generated_content = new_generated
+#     state.chapter_title = chapter_title
+#     state.retry_count = getattr(state, "retry_count", 0) + 1
+
+#     print(f"[Regenerator] ✅ Regeneration complete for chapter: {chapter_title}")
+#     return state
 
 def store_generated_content(session_id, chapter_title, subtopic_title, content):
     """Store generated content in MongoDB and in-memory cache. Upsert if already exists."""
@@ -153,7 +262,7 @@ def main(session_id, chapter_idx=0):
         if cached:
             print(f"Using cached content for {subtopic_title}")
             continue
-        content = generate_content(persona, lesson_plan, subtopic, chapter_title)
+        content = generate_content(persona, lesson_plan, subtopic, chapter_title, feedback=None)
         store_generated_content(session_id, chapter_title, subtopic_title, content)
         print(f"Generated and stored content for {subtopic_title}.md")
 

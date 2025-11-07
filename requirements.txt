@@ -9,3 +9,6 @@ qdrant-client
 pymupdf
 langchain_huggingface
 sentence-transformers
+passlib[bcrypt]
+PyJWT
+bcrypt

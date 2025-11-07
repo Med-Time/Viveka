@@ -2,12 +2,16 @@ from fastapi import FastAPI
 from interview_module.routes.interview_routes import router as interview_router
 from lesson_plan_module.routes.lesson_plan_routes import router as lesson_plan_router
 from migrate_db.migration import router as migrate_router
+from content_module.content_routes import router as content_router
+from auth.routes import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 app.include_router(migrate_router)
+app.include_router(auth_router)
 app.include_router(interview_router)
 app.include_router(lesson_plan_router)
+app.include_router(content_router)
 
 origins = [
     "http://localhost:5173",
