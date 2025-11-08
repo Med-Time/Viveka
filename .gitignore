@@ -5,7 +5,9 @@ server/senv/
 ENV/
 .env/
 .venv/
-
+DB
+core
+.react-router/
 # Python cache files
 __pycache__/
 *.py[cod]
