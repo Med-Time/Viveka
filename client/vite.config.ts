@@ -1,11 +1,18 @@
-import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
-import tailwindcss from "@tailwindcss/vite";
-export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    reactRouter(),
-    tsconfigPaths(),
-  ],
-});
+import react from "@vitejs/plugin-react-swc";
+import path from "path";
+import { componentTagger } from "lovable-tagger";
+
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: "::",
+    port: 8080,
+  },
+  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+}));
