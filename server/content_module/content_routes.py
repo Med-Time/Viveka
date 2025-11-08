@@ -96,3 +96,33 @@ async def get_generated_content(session_id: str, chapter_idx: int):
         return response_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving content: {str(e)}")
+    
+@router.get("/{session_id}/{chapter_idx}/{index}")
+async def get_generated_content_by_subtopic(session_id: str, chapter_idx: int, index: int):
+    """
+    Retrieve the saved content for a specific session, chapter, and subtopic index.
+    """
+    try:
+        content = fetch_generated_content(session_id, chapter_idx)
+        if not content:
+            raise HTTPException(status_code=404, detail="No content found. Generate first.")
+        content.pop("_id", None)  # Remove MongoDB internal ID
+
+        response_data = ContentResponse(**content)
+        generated_list = response_data.generated_content  # List[SubtopicContent]
+
+        # Validate index and return requested subtopic
+        if not generated_list or index < 0 or index >= len(generated_list):
+            raise HTTPException(status_code=404, detail="Subtopic not found for given index.")
+
+        subtopic = generated_list[index]
+        # support both Pydantic model and plain dict
+        title = getattr(subtopic, "title", None)
+        body = getattr(subtopic, "content", None)
+
+        return {"title": title, "content": body}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving content: {str(e)}")

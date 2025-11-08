@@ -3,14 +3,27 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { interviewApi } from "@/features/interview/interview.api";
+import { safeGetJson } from "@/utils/storage";
 
 const onboardingSchema = z.object({
   course: z.string().min(1, "Please select a course"),
@@ -35,13 +48,23 @@ export const OnboardingPage = () => {
 
   const onSubmit = async (data: OnboardingFormData) => {
     try {
-      const userId = localStorage.getItem("user_id") || ""; // replace with real auth state
+      const storedUser = safeGetJson("user");
+      const userId =
+        storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
+      if (!userId) {
+        toast({
+          title: "Not logged in",
+          description: "Please login and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const payload = {
         user_id: userId,
         subject: data.course,
         goal: data.specificGoals,
         level: data.difficulty,
-        // optional extras if backend supports them:
         prior_knowledge: data.priorKnowledge,
         hours_per_week: data.hoursPerWeek,
       };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoginForm } from "./LoginForm";
@@ -11,12 +11,21 @@ export const AuthPage = () => {
   const [activeTab, setActiveTab] = useState("login");
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/dashboard");
     }
   }, [isAuthenticated, navigate]);
+
+  // read `?view=` on mount / when params change
+  useEffect(() => {
+    const view = searchParams.get("view");
+    if (view === "signup" || view === "login") {
+      setActiveTab(view);
+    }
+  }, [searchParams]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-4">
@@ -31,7 +40,13 @@ export const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => {
+              setActiveTab(val);
+              setSearchParams({ view: val });
+            }}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>

@@ -9,12 +9,13 @@ import { BookOpen } from "lucide-react";
 import { lessonPlanApi } from "./lessonPlan.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
+import { safeGetJson } from "@/utils/storage";
 
 export const LessonPlanPage = () => {
   const navigate = useNavigate();
-  const auth = JSON.parse(localStorage.getItem("user") || "{}");
+  const auth = safeGetJson("user") || {};
   const sessionId = auth?.id;
-  const token = auth.token;
+  const token = auth?.token;
 
   console.log("User ID:", sessionId);
   console.log("Token:", token);

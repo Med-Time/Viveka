@@ -9,6 +9,8 @@ import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut } from "lucide-react"
 import { contentApi } from "./content.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
+import { isString } from "lodash"; // optional, but you can use typeof checks instead
+import { safeGetJson } from "@/utils/storage";
 
 export const ContentPage = () => {
   // Accept optional subtopic index in the URL: /content/:chapter_idx/:subtopic_idx
@@ -16,7 +18,7 @@ export const ContentPage = () => {
   const chapterIdx = parseInt(params.chapter_idx || "0", 10);
   const subtopicIdx = parseInt(params.subtopic_idx || "0", 10); // default 0
   const navigate = useNavigate();
-  const auth = JSON.parse(localStorage.getItem("user") || "{}");
+  const auth = safeGetJson("user") || {};
   const sessionId = auth?.id;
   const [fontSize, setFontSize] = useState(16);
 
@@ -75,26 +77,64 @@ export const ContentPage = () => {
     generateMutation.mutate();
   };
 
-  // Helpers to work with generated_content shape
-  const subtopicTitles = content
-    ? Array.isArray((content as any).generated_content)
-      ? [] // if an array (unexpected) keep empty
-      : Object.keys((content as any).generated_content || {})
-    : [];
+  // Normalize generated_content into list of { title, body }
+  const generatedRaw = (content as any)?.generated_content;
+  const normalizedSubtopics: { title: string; body: string }[] = [];
 
-  const totalSubtopics = subtopicTitles.length;
+  if (generatedRaw) {
+    if (Array.isArray(generatedRaw)) {
+      generatedRaw.forEach((item: any, i: number) => {
+        if (typeof item === "string") {
+          normalizedSubtopics.push({ title: `Subtopic ${i + 1}`, body: item });
+        } else if (item && typeof item === "object") {
+          const title =
+            item.subtopic_title || item.title || item.sub_topic_title || item.name || `Subtopic ${i + 1}`;
+          const body = item.content || item.text || item.body || "";
+          normalizedSubtopics.push({ title, body });
+        } else {
+          normalizedSubtopics.push({ title: `Subtopic ${i + 1}`, body: String(item) });
+        }
+      });
+    } else if (generatedRaw && typeof generatedRaw === "object") {
+      Object.entries(generatedRaw).forEach(([k, v], i) => {
+        if (typeof v === "string") {
+          normalizedSubtopics.push({ title: k, body: v });
+        } else if (v && typeof v === "object") {
+          const body = v.content || v.text || v.body || JSON.stringify(v);
+          normalizedSubtopics.push({ title: k, body });
+        } else {
+          normalizedSubtopics.push({ title: k, body: String(v) });
+        }
+      });
+    } else if (typeof generatedRaw === "string") {
+      normalizedSubtopics.push({ title: (content as any).chapter_title || "Subtopic 1", body: generatedRaw });
+    }
+  }
+
+  const totalSubtopics = normalizedSubtopics.length;
   const currentIdx = Math.max(0, Math.min(totalSubtopics - 1, isNaN(subtopicIdx) ? 0 : subtopicIdx));
-  const currentTitle = subtopicTitles[currentIdx] || "";
-  const currentContent =
-    content && (content as any).generated_content
-      ? (content as any).generated_content[currentTitle] ||
-        // fallback: if generated_content is an array/value
-        (Array.isArray((content as any).generated_content) ? (content as any).generated_content[currentIdx] : "")
-      : "";
+  const currentTitle = normalizedSubtopics[currentIdx]?.title || "";
+  const currentContent = normalizedSubtopics[currentIdx]?.body || "";
 
   // Navigation (subtopic within chapter; if boundary, navigate to prev/next chapter)
   const goToSubtopic = (idx: number) => {
-    navigate(`/content/${idx}`);
+    // update last_read before navigation
+    try {
+      const payload = {
+        sessionId,
+        chapterIdx,
+        subtopicIdx: idx,
+        chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
+        subtopicTitle:
+          normalizedSubtopics[idx]?.title ||
+          Object.keys((content as any)?.generated_content || {})[idx] ||
+          `Subtopic ${idx + 1}`,
+      };
+      localStorage.setItem("last_read", JSON.stringify(payload));
+    } catch {
+      // ignore storage errors
+    }
+    navigate(`/content/${chapterIdx}/${idx}`);
     // reset state so page re-checks existence
     setHasGenerated(null);
   };
@@ -120,7 +160,18 @@ export const ContentPage = () => {
     }
   };
 
+  // also persist when user marks complete or navigates next/previous
   const handleComplete = () => {
+    try {
+      const payload = {
+        sessionId,
+        chapterIdx,
+        subtopicIdx: currentIdx,
+        chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
+        subtopicTitle: currentTitle,
+      };
+      localStorage.setItem("last_read", JSON.stringify(payload));
+    } catch {}
     toast({
       title: "Subtopic completed!",
       description: "Great progress! Keep learning.",

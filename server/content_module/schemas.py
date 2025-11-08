@@ -8,7 +8,7 @@ class ContentRequest(BaseModel):
 
 class SubtopicContent(BaseModel):
     index: int = Field(..., description="0-based index within the chapter.")
-    subtopic_title: str = Field(..., description="Subtopic title.")
+    title: str = Field(..., description="Subtopic title.")
     content: str = Field(..., description="Generated content for the subtopic.")
 
 

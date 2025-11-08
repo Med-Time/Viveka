@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { authApi } from "./auth.api";
 import { useAuth } from "@/hooks/useAuth";
+import { safeSetJson } from "@/utils/storage";
 
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -37,12 +38,11 @@ export const SignupForm = () => {
   const signupMutation = useMutation({
     mutationFn: authApi.signup,
     onSuccess: (data) => {
-      login(data);
       toast({
-        title: "Account created!",
-        description: "Welcome to Viveka. Let's personalize your learning experience.",
+        title: "Account created",
+        description: "Please login with your email and password to continue.",
       });
-      navigate("/onboarding");
+      navigate("/auth?view=login");
     },
     onError: (error: any) => {
       toast({

@@ -3,10 +3,13 @@ import { AppHeader } from "@/components/Layout/AppHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Brain, Target, Play } from "lucide-react";
+import { safeGetJson } from "@/utils/storage";
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
-  const sessionId = localStorage.getItem("session_id");
+  const storedUser = safeGetJson("user");
+  const sessionId =
+    storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
 
   return (
     <div className="min-h-screen bg-background">

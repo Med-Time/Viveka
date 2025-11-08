@@ -17,7 +17,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+export const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -30,49 +30,57 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <DashboardPage />
-                // <ProtectedRoute>
-                // </ProtectedRoute>
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/onboarding"
               element={
+                <ProtectedRoute>
                   <OnboardingPage />
-                // <ProtectedRoute>
-                // </ProtectedRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/interview"
               element={
+                <ProtectedRoute>
                   <InterviewPage />
-                // <ProtectedRoute>
-                // </ProtectedRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/persona"
               element={
+                <ProtectedRoute>
                   <PersonaPage />
-                // <ProtectedRoute>
-                // </ProtectedRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/lesson-plan"
               element={
+                <ProtectedRoute>
                   <LessonPlanPage />
-                // <ProtectedRoute>
-                // </ProtectedRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/content/:chapter_idx"
               element={
+                <ProtectedRoute>
                   <ContentPage />
-                // <ProtectedRoute>
-                // </ProtectedRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/content/:chapter_idx/:subtopic_idx"
+              element={
+                <ProtectedRoute>
+                  <ContentPage />
+                </ProtectedRoute>
               }
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
