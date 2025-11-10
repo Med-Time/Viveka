@@ -9,11 +9,11 @@ def generate_content_node(state):
     """
     Generate content for the given chapter/subtopics using persona + lesson plan.
     """
-    print(f"Starting content generation for session: {state.session_id}, chapter: {state.chapter_idx} in Content Generator Node")
+    print(f"Starting content generation for session: {state.study_id}, chapter: {state.chapter_idx} in Content Generator Node")
     try:
         print(f"State received: {state}")
-        persona, lesson_plan = fetch_persona_and_lesson(state.session_id, state.user_id)
-        print(f"Fetched persona and lesson plan for session: {state.session_id}")
+        persona, lesson_plan = fetch_persona_and_lesson(state.study_id, state.user_id)
+        print(f"Fetched persona and lesson plan for session: {state.study_id}")
         chapter_title = lesson_plan["lesson_plan"]["chapters"][state.chapter_idx]["chapter_title"]
         state.chapter_title = chapter_title
         print(f"Generating content for chapter: {chapter_title}")
@@ -27,7 +27,7 @@ def generate_content_node(state):
         for i, sub in enumerate(subtopics):
             subtopic_title = sub["sub_topic_title"]
             print(f"Generating content for subtopic: {subtopic_title}")
-            cached = get_cached_content(state.session_id, state.chapter_title, state.subtopic_title)
+            cached = get_cached_content(state.study_id, state.chapter_title, state.subtopic_title)
             if cached:
                 print(f"Using cached content for {subtopic_title}")
                 generated.append({ "title": subtopic_title, "content": cached, "index": i })

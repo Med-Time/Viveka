@@ -50,6 +50,6 @@ def generate_curriculum_llm(state):
     input_prompt = prompt.format(**state_dict)
     response = structured_llm.invoke(input_prompt)
     state.curriculum = response.curriculum
-    save_curriculum(state.session_id, state.curriculum)
+    save_curriculum(state.study_id, state.curriculum)
     print(f"Curriculum: {response.curriculum}")
     return state

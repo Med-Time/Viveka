@@ -1,0 +1,113 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  transition: opacity 200ms ease;
+  z-index: 90;
+}
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 330px;
+  max-width: 90%;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.2);
+  transform: translateX(100%);
+  transition: transform 240ms ease;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 12px;
+  overflow: hidden;
+}
+
+ 
+
+.panel[data-open="true"] { transform: translateX(0); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(90deg, #4f46e5, #2563eb);
+  color: white;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.chat {
+  padding: 12px;
+  overflow: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: linear-gradient(#fbfdff, #f7f9ff);
+}
+
+.hint {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px dashed #e6eefc;
+}
+
+.msgUser { align-self: flex-end; max-width: 85%; }
+.msgAssistant { align-self: flex-start; max-width: 85%; }
+
+.msgText {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.msgUser .msgText { background: #111827; color: #fff; }
+
+.composer {
+  padding: 10px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #fff;
+}
+
+.composer input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  outline: none;
+}
+
+.sendBtn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}

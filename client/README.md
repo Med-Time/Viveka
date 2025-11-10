@@ -64,13 +64,13 @@ The application expects the following backend endpoints:
 - `POST /interview/answer` - Submit answer and get evaluation
 
 ### Persona & Planning
-- `GET /persona/{session_id}` - Retrieve learner persona report
-- `GET /lesson-plan/generate/{session_id}` - Trigger lesson plan generation
-- `GET /lesson-plan/{session_id}` - Fetch generated lesson plan
+- `GET /persona/{study_id}` - Retrieve learner persona report
+- `GET /lesson-plan/generate/{study_id}` - Trigger lesson plan generation
+- `GET /lesson-plan/{study_id}` - Fetch generated lesson plan
 
 ### Content
-- `GET /content/generate/{session_id}/{chapter_idx}` - Generate chapter content
-- `GET /content/{session_id}/{chapter_idx}` - Retrieve chapter content
+- `GET /content/generate/{study_id}/{chapter_idx}` - Generate chapter content
+- `GET /content/{study_id}/{chapter_idx}` - Retrieve chapter content
 
 ### Response Types
 

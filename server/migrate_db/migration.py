@@ -14,7 +14,7 @@ try:
         sessions_col, 
         qa_col, 
         persona_col,
-        lesson_plan as lesson_plan_col
+        lesson_plans_col as lesson_plan_col
     )
     # from lesson_plan_module.core.mongo import (
     #     lesson_plan as lesson_plan_col
@@ -104,10 +104,10 @@ async def run_data_migration():
         user_id = session.get("user_id")
         
         # We need the string representation of the BSON ObjectId
-        session_id_str = str(session.get("_id")) 
+        study_id_str = str(session.get("_id")) 
         
         if not user_id:
-            logging.warning(f"Skipping session {session_id_str}: No 'user_id' found.")
+            logging.warning(f"Skipping session {study_id_str}: No 'user_id' found.")
             continue
             
         # 1. Get or create the main user document in our map
@@ -120,11 +120,11 @@ async def run_data_migration():
         
         # 2. Fetch all related data for this single session
         try:
-            qa_docs = list(qa_col.find({"session_id": session_id_str}))
-            persona_doc = persona_col.find_one({"session_id": session_id_str})
-            lesson_plan_doc = lesson_plan_col.find_one({"session_id": session_id_str})
+            qa_docs = list(qa_col.find({"study_id": study_id_str}))
+            persona_doc = persona_col.find_one({"study_id": study_id_str})
+            lesson_plan_doc = lesson_plan_col.find_one({"study_id": study_id_str})
         except Exception as e:
-            logging.error(f"Failed to fetch related data for session {session_id_str}: {e}")
+            logging.error(f"Failed to fetch related data for session {study_id_str}: {e}")
             continue # Skip this session, but continue the migration
 
         # 3. Clean and Validate the embedded data
@@ -132,13 +132,13 @@ async def run_data_migration():
         # Clean QA History
         clean_qa_list = []
         for doc in qa_docs:
-            clean_doc = _clean_doc(doc, ["_id", "session_id"])
+            clean_doc = _clean_doc(doc, ["_id", "study_id"])
             clean_qa_list.append(QAHistoryModel.model_validate(clean_doc).model_dump())
             
         # Clean Persona Report
         clean_persona = None
         if persona_doc:
-            clean_doc = _clean_doc(persona_doc, ["_id", "session_id"])
+            clean_doc = _clean_doc(persona_doc, ["_id", "study_id"])
             clean_persona = PersonaReportModel.model_validate(clean_doc).model_dump()
             
         # Clean Lesson Plan
@@ -146,7 +146,7 @@ async def run_data_migration():
         if lesson_plan_doc:
             # This is where we remove the most redundant fields
             fields_to_remove = [
-                "_id", "session_id", "user_id", "subject", "goal", 
+                "_id", "study_id", "user_id", "subject", "goal", 
                 "level", "persona_report_id", "qa_history_ids", 
                 "curriculum_generated"
             ]
@@ -155,7 +155,7 @@ async def run_data_migration():
 
         # 4. Assemble the final 'StudyModel' object
         new_study = StudyModel(
-            study_id=session_id_str,
+            study_id=study_id_str,
             subject=session.get("subject"),
             goal=session.get("goal"),
             level=session.get("level"),

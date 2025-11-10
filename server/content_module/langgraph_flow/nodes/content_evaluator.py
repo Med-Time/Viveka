@@ -40,7 +40,7 @@ def validate_content_node(state):
     Produces structured scores, comments, and an overall grade.
     """
 
-    print(f"[Evaluator] Starting content evaluation for session: {getattr(state, 'session_id', 'unknown')}")
+    print(f"[Evaluator] Starting content evaluation for session: {getattr(state, 'study_id', 'unknown')}")
 
     try:
         # ---------------- Basic Validation ----------------
@@ -50,7 +50,7 @@ def validate_content_node(state):
             return state
 
         # ---------------- Context Fetch ----------------
-        persona, lesson_plan = fetch_persona_and_lesson(state.session_id, getattr(state, "user_id", None))
+        persona, lesson_plan = fetch_persona_and_lesson(state.study_id, getattr(state, "user_id", None))
         # Build full persona context (mirrors generator input)
         persona_summary = f"""
             Goal: {lesson_plan.get('goal', 'General Learning')}

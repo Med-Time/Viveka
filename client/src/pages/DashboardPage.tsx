@@ -8,8 +8,17 @@ import { safeGetJson } from "@/utils/storage";
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const storedUser = safeGetJson("user");
-  const sessionId =
-    storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
+  const sessionId = storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
+
+  // read last-read location if present
+  let lastRead = null;
+  try {
+    lastRead = JSON.parse(localStorage.getItem("last_read") || "null");
+  } catch {
+    lastRead = null;
+  }
+
+  const canContinue = lastRead && lastRead.sessionId && sessionId && lastRead.sessionId === sessionId;
 
   return (
     <div className="min-h-screen bg-background">
@@ -97,6 +106,34 @@ export const DashboardPage = () => {
                 </CardContent>
               </Card>
             </>
+          )}
+
+          {/* Continue Reading card */}
+          {canContinue && (
+            <Card className="transition-shadow hover:shadow-md col-span-full md:col-span-1">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">
+                  <BookOpen className="h-6 w-6 text-accent" />
+                </div>
+                <CardTitle>Continue Reading</CardTitle>
+                <CardDescription>
+                  Continue where you left off
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-2 text-sm text-muted-foreground">
+                  {lastRead.chapterTitle ? lastRead.chapterTitle : `Chapter ${lastRead.chapterIdx}`}
+                  {lastRead.subtopicTitle ? ` — ${lastRead.subtopicTitle}` : ` — Subtopic ${lastRead.subtopicIdx + 1}`}
+                </div>
+                <Button
+                  onClick={() => navigate(`/content/${lastRead.chapterIdx}/${lastRead.subtopicIdx}`)}
+                  variant="outline"
+                  className="w-full gap-2"
+                >
+                  Continue
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </div>
 

@@ -28,7 +28,7 @@ class InterviewState(BaseModel):
     retry_count: int = 0
     use_rag: bool = False
     done: bool = False
-    session_id: Optional[str] = None
+    study_id: Optional[str] = None
     persona_summary: Optional[str] = None
 
 # Create a graph for just the first question (curriculum + first question)

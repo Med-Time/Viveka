@@ -29,9 +29,9 @@ export const InterviewPage = () => {
 
   useEffect(() => {
     if (startData) {
-      setSessionId(startData.session_id);
+      setSessionId(startData.study_id);
       setCurrentQuestion(startData.question);
-      localStorage.setItem("session_id", startData.session_id);
+      localStorage.setItem("study_id", startData.study_id);
     }
   }, [startData]);
 
@@ -61,7 +61,7 @@ export const InterviewPage = () => {
     const answerValue = Array.isArray(answer) ? answer.join(", ") : answer;
 
     answerMutation.mutate({
-      session_id: sessionId,
+      study_id: sessionId,
       question_id: currentQuestion.id,
       answer: answerValue,
     });

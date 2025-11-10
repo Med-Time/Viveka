@@ -11,6 +11,8 @@ import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { isString } from "lodash"; // optional, but you can use typeof checks instead
 import { safeGetJson } from "@/utils/storage";
+import Assistant from '../ai_assistant/assistant';
+import Assistant_style from "../ai_assistant/assistant_style.module.css"
 
 export const ContentPage = () => {
   // Accept optional subtopic index in the URL: /content/:chapter_idx/:subtopic_idx
@@ -19,20 +21,20 @@ export const ContentPage = () => {
   const subtopicIdx = parseInt(params.subtopic_idx || "0", 10); // default 0
   const navigate = useNavigate();
   const auth = safeGetJson("user") || {};
-  const sessionId = auth?.id;
+  const studyID = auth?.id;
   const [fontSize, setFontSize] = useState(16);
 
   const [hasGenerated, setHasGenerated] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
 
   const { data: content, isLoading, refetch } = useQuery({
-    queryKey: queryKeys.content.get(sessionId, chapterIdx),
-    queryFn: () => contentApi.get(sessionId, chapterIdx),
-    enabled: hasGenerated === true && !!sessionId,
+    queryKey: queryKeys.content.get(studyID, chapterIdx),
+    queryFn: () => contentApi.get(studyID, chapterIdx),
+    enabled: hasGenerated === true && !!studyID,
   });
 
   const generateMutation = useMutation({
-    mutationFn: () => contentApi.generate(sessionId, chapterIdx),
+    mutationFn: () => contentApi.generate(studyID, chapterIdx),
     onSuccess: () => {
       setHasGenerated(true);
       toast({
@@ -46,7 +48,7 @@ export const ContentPage = () => {
   });
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!studyID) {
       setHasGenerated(false);
       return;
     }
@@ -54,7 +56,7 @@ export const ContentPage = () => {
     (async () => {
       setChecking(true);
       try {
-        await contentApi.get(sessionId, chapterIdx);
+        await contentApi.get(studyID, chapterIdx);
         if (!mounted) return;
         setHasGenerated(true);
       } catch (err) {
@@ -67,10 +69,10 @@ export const ContentPage = () => {
     return () => {
       mounted = false;
     };
-  }, [sessionId, chapterIdx]);
+  }, [studyID, chapterIdx]);
 
   const handleGenerate = () => {
-    if (!sessionId) {
+    if (!studyID) {
       toast({ title: "Error", description: "Missing session id", variant: "destructive" });
       return;
     }
@@ -121,7 +123,7 @@ export const ContentPage = () => {
     // update last_read before navigation
     try {
       const payload = {
-        sessionId,
+        studyID,
         chapterIdx,
         subtopicIdx: idx,
         chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
@@ -164,7 +166,7 @@ export const ContentPage = () => {
   const handleComplete = () => {
     try {
       const payload = {
-        sessionId,
+        studyID,
         chapterIdx,
         subtopicIdx: currentIdx,
         chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
@@ -177,6 +179,8 @@ export const ContentPage = () => {
       description: "Great progress! Keep learning.",
     });
   };
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   if (checking || isLoading || generateMutation.isPending) {
     return (
@@ -227,6 +231,24 @@ export const ContentPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
+       <div className={Assistant_style.container}>
+      <button
+        onClick={() => setAssistantOpen(true)}
+        style={{
+          position: 'fixed',
+          right: 30,
+          top: 600,
+          zIndex: 80,
+          background: '#2563eb',
+          color: '#fff',
+          border: 'none',
+          padding: '8px 12px',
+          borderRadius: 8,
+          cursor: 'pointer'
+        }}
+      >
+       💬 AI Assistant
+      </button>
       <div className="container mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -267,6 +289,8 @@ export const ContentPage = () => {
           </Button>
         </div>
       </div>
+      <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>
+  </div> 
   );
 };

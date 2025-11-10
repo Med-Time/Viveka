@@ -3,7 +3,7 @@ from typing import Dict, Optional, Any, Literal, List
 
 # ---------------- Pydantic Models ----------------
 class ContentRequest(BaseModel):
-    session_id: str
+    study_id: str
     chapter_idx: int
 
 class SubtopicContent(BaseModel):
@@ -13,8 +13,7 @@ class SubtopicContent(BaseModel):
 
 
 class ContentResponse(BaseModel):
-    created_at: Optional[Any]
-    session_id: str
+    study_id: str
     user_id: str
     chapter_idx: int
     chapter_title: str
@@ -22,7 +21,7 @@ class ContentResponse(BaseModel):
 
 
 class ContentInput(BaseModel):
-    session_id: str = Field(..., description="The session/user ID")
+    study_id: str = Field(..., description="The session/user ID")
     user_id: Optional[str] = Field(None, description="The user ID associated with the session")
     chapter_idx: int = Field(..., description="Index of the chapter to generate content for")
     chapter_title: Optional[str] = Field(None, description="Title of the chapter")
@@ -56,7 +55,7 @@ class ContentInput(BaseModel):
         allow_mutation = True
         json_schema_extra = {
             "example": {
-                "session_id": "sess_abc123",
+                "study_id": "sess_abc123",
                 "user_id": "user_001",
                 "chapter_idx": 0,
                 "chapter_title": "Introduction to Algebra",

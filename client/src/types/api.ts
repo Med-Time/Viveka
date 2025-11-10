@@ -10,7 +10,7 @@ export interface StartInterviewRequest {
 }
 
 export interface StartInterviewResponse {
-  session_id: string;
+  study_id: string;
   question: {
     id: string;
     type: QuestionType;
@@ -21,7 +21,7 @@ export interface StartInterviewResponse {
 }
 
 export interface AnswerInterviewRequest {
-  session_id: string;
+  study_id: string;
   question_id: string;
   answer: string | string[];  // text, mcq option key(s), or blanks joined
 }
@@ -37,7 +37,7 @@ export interface AnswerInterviewResponse {
 }
 
 export interface PersonaReport {
-  session_id: string;
+  study_id: string;
   summary: string;
   traits: Array<{ key: string; value: string }>;
   recommended_level?: string;
@@ -62,7 +62,7 @@ export interface LessonPlan {
 };
 
 export interface ChapterContent {
-  session_id: string;
+  study_id: string;
   chapter_idx: number;
   chapter_title: string;
   generated_content: Record<string, string>;

@@ -25,7 +25,8 @@ def login(req: LoginRequest):
     token = services.create_access_token({"sub": user["id"], "email": user["email"]})
     # create refresh token and store
     refresh = services.create_refresh_token_for_user(user["id"])
-    user_out = UserOut(id=user["id"], email=user["email"], full_name=user.get("full_name"))
+    
+    user_out = UserOut(id=user["id"], email=user["email"], full_name=user.get("full_name"), studies=user.get("studies"))
     return TokenResponse(access_token=token, user=user_out), {"refresh_token": refresh}
 
 # NOTE: above login returned a tuple; better to return combined response
