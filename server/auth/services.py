@@ -6,6 +6,10 @@ import hashlib
 import secrets
 from auth.schemas import SignupRequest
 from typing import Optional
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+import jwt
+
 
 # hashing (prefer passlib if available)
 try:
@@ -32,6 +36,22 @@ JWT_ALG = os.getenv("JWT_ALG", "HS256")
 JWT_EXP_MIN = int(os.getenv("JWT_EXP_MIN", "60"))
 REFRESH_TOKEN_DAYS = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
 RESET_TOKEN_HOURS = int(os.getenv("RESET_TOKEN_HOURS", "1"))
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    return user_id
 
 def create_user(req: SignupRequest) -> str:
     col = users_collection()

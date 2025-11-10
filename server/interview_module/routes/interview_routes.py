@@ -13,7 +13,7 @@ from bson import ObjectId
 
 router = APIRouter()
 
-@router.post("/interview/start")
+@router.post("start")
 def start_interview(data: InterviewStartInput):
     # Create DB session
     session_id = create_interview_session(
@@ -58,7 +58,7 @@ def start_interview(data: InterviewStartInput):
     }
 
 
-@router.post("/interview/answer")
+@router.post("answer")
 def answer_question(data: AnswerInput):
     # Load session state
     state = load_state(data.user_id)
