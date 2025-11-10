@@ -11,6 +11,8 @@ import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { isString } from "lodash"; // optional, but you can use typeof checks instead
 import { safeGetJson } from "@/utils/storage";
+import Assistant from '../ai_assistant/assistant';
+import Assistant_style from "../ai_assistant/assistant_style.module.css"
 
 export const ContentPage = () => {
   // Accept optional subtopic index in the URL: /content/:chapter_idx/:subtopic_idx
@@ -178,6 +180,8 @@ export const ContentPage = () => {
     });
   };
 
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
   if (checking || isLoading || generateMutation.isPending) {
     return (
       <div className="min-h-screen bg-background">
@@ -227,6 +231,24 @@ export const ContentPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
+       <div className={Assistant_style.container}>
+      <button
+        onClick={() => setAssistantOpen(true)}
+        style={{
+          position: 'fixed',
+          right: 30,
+          top: 600,
+          zIndex: 80,
+          background: '#2563eb',
+          color: '#fff',
+          border: 'none',
+          padding: '8px 12px',
+          borderRadius: 8,
+          cursor: 'pointer'
+        }}
+      >
+       💬 AI Assistant
+      </button>
       <div className="container mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -267,6 +289,8 @@ export const ContentPage = () => {
           </Button>
         </div>
       </div>
+      <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>
+  </div> 
   );
 };
