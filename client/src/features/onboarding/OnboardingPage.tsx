@@ -99,21 +99,12 @@ export const OnboardingPage = () => {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="course">Course / Subject</Label>
-                <Select onValueChange={(value) => setValue("course", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a course" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mathematics">Mathematics</SelectItem>
-                    <SelectItem value="physics">Physics</SelectItem>
-                    <SelectItem value="chemistry">Chemistry</SelectItem>
-                    <SelectItem value="biology">Biology</SelectItem>
-                    <SelectItem value="computer-science">Computer Science</SelectItem>
-                    <SelectItem value="data-science">Data Science</SelectItem>
-                    <SelectItem value="languages">Languages</SelectItem>
-                    <SelectItem value="business">Business</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Textarea
+                  id="course"
+                  placeholder="Enter the course or subject you want to learn (e.g., Intro to Algorithms)"
+                  {...register("course")}
+                  rows={1}
+                />
                 {errors.course && (
                   <p className="text-sm text-destructive">{errors.course.message}</p>
                 )}

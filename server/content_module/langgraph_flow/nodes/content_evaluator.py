@@ -79,10 +79,44 @@ def validate_content_node(state):
         evaluations: Dict[str, Any] = {}
         subtopic_scores = []
 
-        # ---------------- Iterate Over Generated Content ----------------
-        for content in state.generated_content:
-            subtopic_title = content["title"]
-            subtopic_content = content["content"]
+        # ---------------- Normalize generated_content ----------------
+        # Accept multiple shapes:
+        # - list of dicts: [{ "title"|"subtopic_title": ..., "content": ... }, ...]
+        # - list of Pydantic/SubtopicContent objects with attributes
+        # - dict mapping title -> content
+        gen = getattr(state, "generated_content", None)
+        normalized: Dict[str, str] = {}
+
+        if isinstance(gen, dict):
+            # { title: content | { content: ... } }
+            for k, v in gen.items():
+                if isinstance(v, str):
+                    normalized[k] = v
+                elif isinstance(v, dict):
+                    normalized[k] = v.get("content") or v.get("text") or ""
+                else:
+                    normalized[k] = str(v)
+        elif isinstance(gen, list):
+            for i, item in enumerate(gen):
+                if isinstance(item, dict):
+                    title = item.get("subtopic_title") or item.get("title") or f"subtopic_{i}"
+                    body = item.get("content") or item.get("text") or item.get("body") or ""
+                else:
+                    # assume object with attributes (Pydantic model or similar)
+                    title = getattr(item, "subtopic_title", None) or getattr(item, "title", None) or f"subtopic_{i}"
+                    body = getattr(item, "content", None) or getattr(item, "text", None) or ""
+                    if body is None:
+                        body = str(item)
+                # avoid duplicate keys by appending index
+                key = title if title not in normalized else f"{title}_{i}"
+                normalized[key] = body
+        else:
+            print("[Evaluator] ⚠️ generated_content has unexpected shape; skipping evaluation.")
+            state.error = "generated_content shape unsupported"
+            return state
+
+        # ---------------- Iterate Over Normalized Content ----------------
+        for subtopic_title, subtopic_content in normalized.items():
             print(f"[Evaluator] → Evaluating subtopic: {subtopic_title}")
 
             formatted_prompt = prompt_template.format(

@@ -1,14 +1,18 @@
 import { axiosClient } from "@/api/axiosClient";
-import { AuthResponse, SignupRequest, LoginRequest } from "@/types/api";
+import { safeSetJson } from "@/utils/storage";
 
 export const authApi = {
-  signup: async (data: SignupRequest): Promise<AuthResponse> => {
-    const response = await axiosClient.post<AuthResponse>("/auth/signup", data);
-    return response.data;
+  login: async (payload: { email: string; password: string }) => {
+    const resp = await axiosClient.post("/auth/login", payload);
+    const data = resp.data;
+    const access = data.access_token;
+    if (access) localStorage.setItem("auth_token", access);
+    if (data.user) safeSetJson("user", data.user);
+    return data;
   },
 
-  login: async (data: LoginRequest): Promise<AuthResponse> => {
-    const response = await axiosClient.post<AuthResponse>("/auth/login", data);
-    return response.data;
+  signup: async (payload: any) => {
+    const resp = await axiosClient.post("/auth/signup", payload);
+    return resp.data;
   },
 };

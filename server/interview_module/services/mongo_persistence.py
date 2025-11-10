@@ -1,4 +1,4 @@
-from interview_module.core.mongo import sessions_col, qa_col, persona_col, lesson_plan
+from interview_module.core.mongo import sessions_col, qa_col, persona_col, lesson_plans_col
 from datetime import datetime
 from bson import ObjectId
 

@@ -85,10 +85,12 @@ export interface Chapter {
 
 export interface AuthResponse {
   token: string;
+  token_type: string;
   user: {
     id: string;
     email: string;
-    name?: string;
+    full_name?: string;
+    studies?: string[];
   };
 }
 

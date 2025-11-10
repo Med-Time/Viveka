@@ -18,7 +18,7 @@ class UserOut(BaseModel):
     id: str
     email: EmailStr
     full_name: Optional[str] = None
-    studies: Optional[list[str]] = None
+    studies: Optional[list[dict]] = None
 
 class TokenResponse(BaseModel):
     access_token: str

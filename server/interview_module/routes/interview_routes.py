@@ -87,21 +87,19 @@ def answer_question(data: AnswerInput):
 
     # Save Q/A to MongoDB
     save_qa(
-        study_id=updated_state["study_id"],
-        user_id=updated_state["user_id"],
+        session_id=updated_state["study_id"],
         concept=concept,
-        feedback_history=updated_state["feedback_history"],
+        feedback=updated_state["feedback_history"],
         question=updated_state["current_question"],
         answer=updated_state["answer"],
         score=updated_state["score_history"][-1],
-        retry_count=updated_state["retry_count"],
+        retry=updated_state["retry_count"],
     )
 
     # If finished, save persona report and return summary
     if updated_state.get("done", False):
         save_persona(
-            user_id=updated_state["user_id"],
-            study_id=updated_state["study_id"],
+            session_id=updated_state["study_id"],
             report_text=updated_state.get("persona_summary", ""),
             type="interview",
             #feedback=updated_state["feedback_history"],

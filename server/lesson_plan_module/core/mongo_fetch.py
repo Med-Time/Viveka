@@ -83,7 +83,7 @@ def fetch_lesson_plan(session_id: str):
     lesson_plans_col = sessions_col.database.lesson_plans
     
     # Find the lesson plan for this session
-    lesson_plan = lesson_plans_col.find_one({"session_id": session_id})
+    lesson_plan = lesson_plans_col.find_one({"study_id": session_id})
     
     if lesson_plan:
         # Convert ObjectId to string for JSON serialization

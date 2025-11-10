@@ -111,7 +111,7 @@ async def generate_lesson_plan(study_id: str):
         
         # 7. Save lesson plan to MongoDB
         try:
-            lesson_plan_id = save_lesson_plan(response_data)
+            lesson_plan_id = save_lesson_plan(study_id, response_data)
             response_data["lesson_plan_id"] = lesson_plan_id
             print(f"✅ Lesson plan saved with ID: {lesson_plan_id}")
         except Exception as e:

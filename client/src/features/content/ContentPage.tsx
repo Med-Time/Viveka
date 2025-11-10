@@ -9,7 +9,6 @@ import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut } from "lucide-react"
 import { contentApi } from "./content.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
-import { isString } from "lodash"; // optional, but you can use typeof checks instead
 import { safeGetJson } from "@/utils/storage";
 import Assistant from '../ai_assistant/assistant';
 import Assistant_style from "../ai_assistant/assistant_style.module.css"
@@ -20,9 +19,71 @@ export const ContentPage = () => {
   const chapterIdx = parseInt(params.chapter_idx || "0", 10);
   const subtopicIdx = parseInt(params.subtopic_idx || "0", 10); // default 0
   const navigate = useNavigate();
+
+  // Prefer explicit selected study id in localStorage, fallback to user object
   const auth = safeGetJson("user") || {};
-  const studyID = auth?.id;
+  const persisted = localStorage.getItem("current_study_id");
+  const userStudies: { study_id?: string; subject?: string; created_at?: string }[] = auth?.studies || [];
+  const validPersisted =
+    persisted && userStudies.some((s) => s.study_id === persisted) ? persisted : null;
+  const initial = validPersisted || userStudies?.[0]?.study_id || auth?.current_study_id || null;
+
+  const [currentStudyId, setCurrentStudyId] = useState<string | null>(initial);
+  const [showStudySelector, setShowStudySelector] = useState<boolean>(!Boolean(currentStudyId));
   const [fontSize, setFontSize] = useState(16);
+
+  useEffect(() => {
+    setShowStudySelector(!Boolean(currentStudyId) && userStudies && userStudies.length > 0);
+  }, [currentStudyId, userStudies]);
+
+  const handleSelectStudy = (id: string) => {
+    if (!id) return;
+    localStorage.setItem("current_study_id", id);
+    setCurrentStudyId(id);
+    setShowStudySelector(false);
+  };
+
+  // If no study selected, prompt user to choose or navigate to dashboard/onboarding
+  if (!currentStudyId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader />
+        <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
+          <Card className="max-w-md text-center">
+            <Card className="p-6 text-center">
+              <h2 className="text-xl font-semibold mb-4">Select a study to continue</h2>
+              {userStudies && userStudies.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {userStudies.map((s, i) => (
+                    <div key={s.study_id || i} className="flex items-center justify-between gap-4">
+                      <div className="text-left">
+                        <div className="font-medium">{s.subject || `Study ${i + 1}`}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {s.created_at ? new Date(s.created_at).toLocaleString() : ""}
+                        </div>
+                      </div>
+                      <Button onClick={() => handleSelectStudy(s.study_id || "")}>Select</Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  <p className="mb-4 text-muted-foreground">No studies found. Start onboarding or create a study.</p>
+                  <div className="flex gap-2 justify-center">
+                    <Button onClick={() => navigate("/onboarding")}>Onboarding</Button>
+                    <Button variant="outline" onClick={() => navigate("/interview")}>Start Assessment</Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Use currentStudyId for queries and generation
+  const studyID = currentStudyId;
 
   const [hasGenerated, setHasGenerated] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
