@@ -1,3 +1,4 @@
+import time
 from content_module.services.content_generator import (
             fetch_persona_and_lesson,
             get_subtopics,
@@ -34,6 +35,7 @@ def generate_content_node(state):
                 continue
             print(f"No cached content for {subtopic_title}, generating new content.")
             content = generate_content(persona, lesson_plan, sub, chapter_title, state.content_evaluations[subtopic_title] if hasattr(state, "content_evaluations") and subtopic_title in state.content_evaluations else None)
+            time.sleep(2)  # to avoid rate limits
             print(f"Generated content for {subtopic_title}")
             generated.append({ "title": subtopic_title, "content": content, "index": i })
 

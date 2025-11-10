@@ -91,6 +91,7 @@ async def get_generated_content(study_id: str, chapter_idx: int):
         if not content:
             raise HTTPException(status_code=404, detail="No content found. Generate first.")
         content.pop("_id", None)  # Remove MongoDB internal ID
+        content.pop("created_at", None)  # Remove created_at if not needed
         response_data = ContentResponse(**content)
         return response_data
     except Exception as e:
@@ -106,7 +107,7 @@ async def get_generated_content_by_subtopic(study_id: str, chapter_idx: int, ind
         if not content:
             raise HTTPException(status_code=404, detail="No content found. Generate first.")
         content.pop("_id", None)  # Remove MongoDB internal ID
-
+        content.pop("created_at", None)  # Remove created_at if not needed
         response_data = ContentResponse(**content)
         generated_list = response_data.generated_content  # List[SubtopicContent]
 

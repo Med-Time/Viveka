@@ -4,6 +4,7 @@ from langchain.prompts import ChatPromptTemplate
 from content_module.services.content_generator import fetch_persona_and_lesson
 from content_module.schemas import ContentEvaluation, SubtopicEvaluation
 from typing import Dict, Any
+import time
 
 # Initialize Evaluator LLM
 _eval_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1)
@@ -129,6 +130,7 @@ def validate_content_node(state):
 
             # Invoke LLM
             response = _eval_llm.invoke(formatted_prompt)
+            time.sleep(2)  # to avoid rate limits
 
             # Try parsing structured output
             try:
