@@ -1,4 +1,4 @@
-from interview_module.core.mongo import sessions_col, qa_col, persona_col, lesson_plans_col
+from interview_module.core.mongo import sessions_col, qa_col, persona_col, lesson_plans_col, users_collection
 from datetime import datetime
 from bson import ObjectId
 
@@ -30,7 +30,7 @@ def save_qa(session_id,feedback, concept, question, answer, score, retry):
 def save_persona(session_id, report_text, type="interview"):
     # Create a base document
     persona_doc = {
-        "session_id": session_id,
+        "study_id": session_id,
         "type": type,
         "created_at": datetime.utcnow()
     }
@@ -79,14 +79,14 @@ def save_lesson_plan(session_id, lesson_plan_data):
         lesson_plan_doc.update(lesson_plan_data)
         
         # Get the correct collection - use lesson_plans (plural)
-        lesson_plans_col = sessions_col.database.lesson_plans
+        lesson_plans = sessions_col.database.lesson_plans
         
         # Check if a lesson plan for this session already exists
-        existing_plan = lesson_plans_col.find_one({"session_id": session_id})
+        existing_plan = lesson_plans.find_one({"session_id": session_id})
         
         if existing_plan:
             # Update existing plan
-            result = lesson_plans_col.update_one(
+            result = lesson_plans.update_one(
                 {"session_id": session_id},
                 {"$set": lesson_plan_doc}
             )
@@ -99,3 +99,13 @@ def save_lesson_plan(session_id, lesson_plan_data):
         print(f"Exception in save_lesson_plan: {str(e)}")
         raise
 
+def save_study(user_id, study_id, subject):
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$push": {"studies": {
+            "study_id": study_id,
+            "subject": subject,
+            "created_at": datetime.utcnow()
+        }}}
+    )
+    return 

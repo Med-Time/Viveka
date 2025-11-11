@@ -1,4 +1,4 @@
-export type QuestionType = "mcq" | "open" | "fill";
+export type QuestionType = "mcq" | "detailed_answer" | "fill_in_the_blanks" | "one_word_answer";
 
 export interface StartInterviewRequest {
   user_id: string;
@@ -10,37 +10,35 @@ export interface StartInterviewRequest {
 }
 
 export interface StartInterviewResponse {
+  status: string;
   study_id: string;
-  question: {
-    id: string;
-    type: QuestionType;
-    prompt: string;
-    options?: string[];        // for mcq
-    blanks?: number;           // for fill
-  } | null;
+  type: QuestionType;
+  question: string;
+  concept?: string;
+  
 }
 
 export interface AnswerInterviewRequest {
-  study_id: string;
-  question_id: string;
-  answer: string | string[];  // text, mcq option key(s), or blanks joined
+  user_id: string;
+  answer: string;
 }
 
 export interface AnswerInterviewResponse {
-  evaluation?: {
-    correctness?: "correct" | "partial" | "incorrect";
-    score?: number;            // 0-1
-    feedback?: string;
-  };
-  next_question?: StartInterviewResponse["question"] | null;
-  completed: boolean;
+  score?: number;
+  question: StartInterviewResponse;
 }
 
 export interface PersonaReport {
-  study_id: string;
-  summary: string;
-  traits: Array<{ key: string; value: string }>;
-  recommended_level?: string;
+  type: string;
+  created_at: Date;
+  learner_profile_summary: string;
+  learning_style_assessment: string[];
+  strengths: string[];
+  weaknesses_and_gaps: string[];
+  common_misconceptions: string[];
+  engagement_and_confidence: string;
+  actionable_learning_recommendations: string[];
+  preliminary_personalized_roadmap_suggestions: string[];
 }
 
 export interface LessonPlanItem {

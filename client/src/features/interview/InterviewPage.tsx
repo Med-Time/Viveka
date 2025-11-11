@@ -1,108 +1,121 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
-import { McqQuestion } from "@/components/Question/McqQuestion";
 import { OpenQuestion } from "@/components/Question/OpenQuestion";
-import { FillBlanksQuestion } from "@/components/Question/FillBlanksQuestion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { interviewApi } from "./interview.api";
-import { StartInterviewResponse, AnswerInterviewResponse } from "@/types/api";
+import {
+  StartInterviewResponse,
+  AnswerInterviewResponse,
+  QuestionType,
+} from "@/types/api";
+import { safeGetJson } from "@/utils/storage";
 import { toast } from "@/hooks/use-toast";
+
+type LocationState = {
+  start: StartInterviewResponse;
+};
 
 export const InterviewPage = () => {
   const navigate = useNavigate();
-  const [sessionId, setSessionId] = useState<string>("");
-  const [currentQuestion, setCurrentQuestion] = useState<StartInterviewResponse["question"]>(null);
-  const [questionNumber, setQuestionNumber] = useState(1);
-  const [evaluation, setEvaluation] = useState<AnswerInterviewResponse["evaluation"] | null>(null);
-  const [showEvaluation, setShowEvaluation] = useState(false);
+  const location = useLocation();
 
-  const { data: startData, isLoading: startLoading } = useQuery({
-    queryKey: ["interview", "start"],
-    queryFn: interviewApi.start,
-  });
+  // Expect the onboarding page to pass this:
+  // navigate("/interview", { state: { start: startResponse } })
+  const startFromState = (location.state as LocationState | null)?.start || null;
 
-  useEffect(() => {
-    if (startData) {
-      setSessionId(startData.study_id);
-      setCurrentQuestion(startData.question);
-      localStorage.setItem("study_id", startData.study_id);
-    }
-  }, [startData]);
-
-  const answerMutation = useMutation({
-    mutationFn: interviewApi.answer,
-    onSuccess: (data) => {
-      setEvaluation(data.evaluation || null);
-      setShowEvaluation(true);
-
-      if (data.completed) {
-        toast({
-          title: "Assessment Complete!",
-          description: "Let's see your personalized learning profile.",
-        });
-        setTimeout(() => {
-          navigate("/persona");
-        }, 2000);
-      } else if (data.next_question) {
-        // Will show Continue button
-      }
-    },
-  });
-
-  const handleSubmitAnswer = (answer: string | string[]) => {
-    if (!currentQuestion || !sessionId) return;
-
-    const answerValue = Array.isArray(answer) ? answer.join(", ") : answer;
-
-    answerMutation.mutate({
-      study_id: sessionId,
-      question_id: currentQuestion.id,
-      answer: answerValue,
-    });
-  };
-
-  const handleContinue = () => {
-    const nextQuestion = answerMutation.data?.next_question;
-    if (nextQuestion) {
-      setCurrentQuestion(nextQuestion);
-      setQuestionNumber(questionNumber + 1);
-      setShowEvaluation(false);
-      setEvaluation(null);
-    }
-  };
-
-  if (startLoading) {
+  // If user directly lands on this page (no state), ask them to start onboarding
+  if (!startFromState) {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader />
         <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="text-muted-foreground">Preparing your assessment...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentQuestion) {
-    return (
-      <div className="min-h-screen bg-background">
-        <AppHeader />
-        <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center">
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground">No questions available.</p>
+          <Card className="p-6 text-center space-y-4">
+            <p className="text-muted-foreground">
+              You haven’t started an assessment yet.
+            </p>
+            <Button onClick={() => navigate("/onboarding")}>Start Assessment</Button>
           </Card>
         </div>
       </div>
     );
   }
+
+  const [current, setCurrent] = useState<StartInterviewResponse>(startFromState);
+  const [questionNumber, setQuestionNumber] = useState(1);
+  const [score, setScore] = useState<number | null>(null);
+  const [showResult, setShowResult] = useState(false);
+
+  const storedUser = safeGetJson("user");
+  const userId =
+    storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
+
+  const answerMutation = useMutation<
+    AnswerInterviewResponse,
+    unknown,
+    { answer: string }
+  >({
+    mutationFn: ({ answer }) => {
+      if (!userId) {
+        return Promise.reject(new Error("Missing user_id"));
+      }
+      // API requires only { user_id, answer }
+      return interviewApi.answer({
+        user_id: userId,
+        answer,
+      });
+    },
+    onSuccess: (data) => {
+      setScore(typeof data.score === "number" ? data.score : null);
+      setShowResult(true);
+
+      // Backend returns the next question in data.question (type: StartInterviewResponse)
+      // We won’t immediately switch — we show a Continue button.
+      if (!data.question) {
+        toast({
+          title: "Answer recorded",
+          description: "Proceed when ready.",
+        });
+      }
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not submit answer",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmitAnswer = (answer: string | string[]) => {
+    const answerValue = Array.isArray(answer) ? answer.join(", ") : answer;
+    setShowResult(false);
+    setScore(null);
+    answerMutation.mutate({ answer: answerValue });
+  };
+
+  const handleContinue = () => {
+    const next = answerMutation.data?.question;
+    if (next) {
+      setCurrent(next);
+      setQuestionNumber((n) => n + 1);
+      setShowResult(false);
+      setScore(null);
+    } else {
+      // If backend eventually ends the flow (not in types), send user to persona
+      navigate("/persona");
+    }
+  };
+
+  const qType: QuestionType = current.type;
+  const prompt = current.question; // string per API
+  const concept = current.concept; // optional hint
+  const studyId = current.study_id;
 
   return (
     <div className="min-h-screen bg-background">
@@ -123,33 +136,27 @@ export const InterviewPage = () => {
           <Progress value={questionNumber * 10} className="h-2" />
         </div>
 
-        {showEvaluation && evaluation && (
+        {/* Result / score card */}
+        {showResult && (
           <Card className="mb-6 p-4">
             <div className="flex items-start gap-3">
-              {evaluation.correctness === "correct" && (
-                <CheckCircle className="h-5 w-5 text-success" />
-              )}
-              {evaluation.correctness === "partial" && (
-                <AlertCircle className="h-5 w-5 text-accent" />
-              )}
-              {evaluation.correctness === "incorrect" && (
-                <XCircle className="h-5 w-5 text-destructive" />
-              )}
+              <CheckCircle className="h-5 w-5" />
               <div className="flex-1">
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="font-semibold capitalize">{evaluation.correctness}</span>
-                  {evaluation.score !== undefined && (
-                    <Badge variant="secondary">
-                      {Math.round(evaluation.score * 100)}%
-                    </Badge>
+                  <span className="font-semibold">Answer submitted</span>
+                  {typeof score === "number" && (
+                    <Badge variant="secondary">{Math.round(score * 100)}%</Badge>
                   )}
                 </div>
-                {evaluation.feedback && (
-                  <p className="text-sm text-muted-foreground">{evaluation.feedback}</p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  {typeof score === "number"
+                    ? "Score reflects how well your answer matched the expected response."
+                    : "Your response has been recorded."}
+                </p>
               </div>
             </div>
-            {answerMutation.data?.next_question && (
+
+            {answerMutation.data?.question && (
               <Button onClick={handleContinue} className="mt-4 w-full">
                 Continue to Next Question
               </Button>
@@ -157,37 +164,19 @@ export const InterviewPage = () => {
           </Card>
         )}
 
-        {!showEvaluation && (
+        {/* Question */}
+        {!showResult && (
           <>
-            {currentQuestion.type === "mcq" && currentQuestion.options && (
-              <McqQuestion
-                id={currentQuestion.id}
-                prompt={currentQuestion.prompt}
-                options={currentQuestion.options}
-                questionNumber={questionNumber}
-                onSubmit={handleSubmitAnswer}
-                disabled={answerMutation.isPending}
-              />
-            )}
-            {currentQuestion.type === "open" && (
-              <OpenQuestion
-                id={currentQuestion.id}
-                prompt={currentQuestion.prompt}
-                questionNumber={questionNumber}
-                onSubmit={handleSubmitAnswer}
-                disabled={answerMutation.isPending}
-              />
-            )}
-            {currentQuestion.type === "fill" && currentQuestion.blanks && (
-              <FillBlanksQuestion
-                id={currentQuestion.id}
-                prompt={currentQuestion.prompt}
-                blanks={currentQuestion.blanks}
-                questionNumber={questionNumber}
-                onSubmit={(answers) => handleSubmitAnswer(answers)}
-                disabled={answerMutation.isPending}
-              />
-            )}
+            {/* Your API doesn’t provide MCQ options or blanks in the type definitions,
+                so we use OpenQuestion for all types. */}
+            <OpenQuestion
+              id={`${studyId}-${questionNumber}`}
+              prompt={prompt}
+              questionNumber={questionNumber}
+              onSubmit={handleSubmitAnswer}
+              disabled={answerMutation.isPending}
+              hint={concept}
+            />
           </>
         )}
       </div>

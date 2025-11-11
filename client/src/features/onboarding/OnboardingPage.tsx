@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { interviewApi } from "@/features/interview/interview.api";
-import { safeGetJson } from "@/utils/storage";
+import { safeGetJson, safeSetJson } from "@/utils/storage";
+import { StartInterviewRequest, StartInterviewResponse } from "@/types/api";
 
 const onboardingSchema = z.object({
   course: z.string().min(1, "Please select a course"),
@@ -60,7 +61,7 @@ export const OnboardingPage = () => {
         return;
       }
 
-      const payload = {
+      const payload: StartInterviewRequest = {
         user_id: userId,
         subject: data.course,
         goal: data.specificGoals,
@@ -69,12 +70,14 @@ export const OnboardingPage = () => {
         hours_per_week: data.hoursPerWeek,
       };
 
-      await interviewApi.start(payload);
+      const res: StartInterviewResponse = await interviewApi.start(payload);
+
+      localStorage.setItem("current_study_id", res.study_id);
       toast({
         title: "Preferences saved!",
         description: "Let's begin your assessment.",
       });
-      navigate("/interview");
+      navigate("/interview", {state: {start: res}});
     } catch (err) {
       toast({
         title: "Error",

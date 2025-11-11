@@ -6,14 +6,14 @@ from interview_module.services.mongo_persistence import (
     create_interview_session,
     save_qa,
     save_persona,
-    
+    save_study
 )
 from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
 from bson import ObjectId
 
 router = APIRouter()
 
-@router.post("start")
+@router.post("/start")
 def start_interview(data: InterviewStartInput):
     # Create DB session
     study_id = create_interview_session(
@@ -49,7 +49,7 @@ def start_interview(data: InterviewStartInput):
             "study_id": study_id
         }
     
-    
+    save_study(data.user_id, study_id, data.subject)
     
     # Return the first question
     return {
@@ -61,7 +61,7 @@ def start_interview(data: InterviewStartInput):
     }
 
 
-@router.post("answer")
+@router.post("/answer")
 def answer_question(data: AnswerInput):
     # Load session state
     state = load_state(data.user_id)
@@ -115,6 +115,7 @@ def answer_question(data: AnswerInput):
     # Else, return next question
     return {
         "status": "ok",
+        "study_id": updated_state["study_id"],
         "type": updated_state.get("current_question_type"),
         "question": updated_state["current_question"],
         "concept": updated_state["curriculum"][updated_state["current_concept_index"]],

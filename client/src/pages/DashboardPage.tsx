@@ -5,16 +5,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { BookOpen, Brain, Target, Play } from "lucide-react";
 import { safeGetJson } from "@/utils/storage";
+// ⬇️ shadcn select
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const storedUser = safeGetJson("user") || {};
   const persistedStudyId = localStorage.getItem("current_study_id");
-  const userStudies: { study_id?: string; subject?: string; created_at?: string }[] = storedUser?.studies || [];
-  // prefer a validated persisted id (must belong to user's studies); else use first study id if available
-  console.log("DashboardPage: userStudies =", userStudies);
+  const userStudies: { study_id?: string; subject?: string; created_at?: string }[] =
+    storedUser?.studies || [];
+
+  // validate persisted study id against user's studies
   const validPersisted =
-    persistedStudyId && userStudies.some((s) => s.study_id === persistedStudyId) ? persistedStudyId : null;
+    persistedStudyId && userStudies.some((s) => s.study_id === persistedStudyId)
+      ? persistedStudyId
+      : null;
   const defaultStudyId = userStudies?.[0]?.study_id || storedUser?.current_study_id || "";
 
   const [currentStudyId, setCurrentStudyId] = useState<string>(validPersisted || defaultStudyId);
@@ -30,7 +41,7 @@ export const DashboardPage = () => {
   }, [currentStudyId, userStudies]);
 
   // read last-read location if present
-  let lastRead = null;
+  let lastRead: any = null;
   try {
     lastRead = JSON.parse(localStorage.getItem("last_read") || "null");
   } catch {
@@ -43,18 +54,46 @@ export const DashboardPage = () => {
   const handleSelectStudy = (studyId: string) => {
     if (!studyId) return;
     localStorage.setItem("current_study_id", studyId);
-    // do NOT write user id or "session_id" here — keep only current_study_id
+    // keep only current_study_id in storage (no user/session ids here)
     setCurrentStudyId(studyId);
     setShowStudySelector(false);
   };
+
+  const hasMultipleSubjects = userStudies.length > 1;
 
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold">Welcome to Your Dashboard</h1>
-          <p className="text-muted-foreground">Continue your personalized learning journey</p>
+        {/* Header row with right-side Subject switcher */}
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="mb-2 text-3xl font-bold">Welcome to Your Dashboard</h1>
+            <p className="text-muted-foreground">Continue your personalized learning journey</p>
+          </div>
+
+          {hasMultipleSubjects && (
+            <div className="min-w-[240px]">
+              <Select
+                value={currentStudyId || undefined}
+                onValueChange={(v) => handleSelectStudy(v)}
+              >
+                <SelectTrigger className="w-[240px]">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userStudies.map((s, i) => (
+                    <SelectItem key={s.study_id || String(i)} value={s.study_id || ""}>
+                      {s.subject || `Study ${i + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-1 text-right text-xs text-muted-foreground">
+                Switch subject
+              </div>
+            </div>
+          )}
         </div>
 
         {/* If user has multiple studies and no current selected, prompt selection */}
@@ -67,7 +106,6 @@ export const DashboardPage = () => {
             <CardContent>
               <div className="flex flex-col gap-3">
                 {userStudies.map((s, i) => (
-                  console.log("DashboardPage: rendering study", s),
                   <div key={s.study_id || i} className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-medium">{s.subject || `Study ${i + 1}`}</div>
@@ -131,7 +169,11 @@ export const DashboardPage = () => {
                   <CardDescription>See your learning persona and recommendations</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button onClick={() => navigate("/persona")} variant="outline" className="w-full gap-2">
+                  <Button
+                    onClick={() => navigate("/persona")}
+                    variant="outline"
+                    className="w-full gap-2"
+                  >
                     <Play className="h-4 w-4" />
                     View Profile
                   </Button>
@@ -149,10 +191,8 @@ export const DashboardPage = () => {
                 <CardContent>
                   <Button
                     onClick={() => {
-                      // ensure current study saved before navigating
                       if (!localStorage.getItem("current_study_id")) {
                         localStorage.setItem("current_study_id", currentStudyId);
-                        localStorage.setItem("study_id", currentStudyId);
                       }
                       navigate("/lesson-plan");
                     }}
@@ -180,7 +220,9 @@ export const DashboardPage = () => {
               <CardContent>
                 <div className="mb-2 text-sm text-muted-foreground">
                   {lastRead.chapterTitle ? lastRead.chapterTitle : `Chapter ${lastRead.chapterIdx}`}
-                  {lastRead.subtopicTitle ? ` — ${lastRead.subtopicTitle}` : ` — Subtopic ${lastRead.subtopicIdx + 1}`}
+                  {lastRead.subtopicTitle
+                    ? ` — ${lastRead.subtopicTitle}`
+                    : ` — Subtopic ${lastRead.subtopicIdx + 1}`}
                 </div>
                 <Button
                   onClick={() => navigate(`/content/${lastRead.chapterIdx}/${lastRead.subtopicIdx}`)}

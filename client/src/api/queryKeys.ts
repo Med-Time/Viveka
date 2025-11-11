@@ -2,15 +2,15 @@ export const queryKeys = {
   health: ["health"],
   interview: {
     start: ["interview", "start"],
-    session: (sessionId: string) => ["interview", "session", sessionId],
+    session: (studyId: string) => ["interview", "session", studyId],
   },
-  persona: (sessionId: string) => ["persona", sessionId],
+  persona: (studyId: string) => ["persona", studyId],
   lessonPlan: {
-    get: (sessionId: string) => ["lessonPlan", sessionId],
-    generate: (sessionId: string) => ["lessonPlan", "generate", sessionId],
+    get: (studyId: string) => ["lessonPlan", studyId],
+    generate: (studyId: string) => ["lessonPlan", "generate", studyId],
   },
   content: {
-    get: (sessionId: string, chapterIdx: number) => ["content", sessionId, chapterIdx],
-    generate: (sessionId: string, chapterIdx: number) => ["content", "generate", sessionId, chapterIdx],
+    get: (studyId: string, chapterIdx: number) => ["content", studyId, chapterIdx],
+    generate: (studyId: string, chapterIdx: number) => ["content", "generate", studyId, chapterIdx],
   },
 };
