@@ -37,7 +37,7 @@ JWT_EXP_MIN = int(os.getenv("JWT_EXP_MIN", "60"))
 REFRESH_TOKEN_DAYS = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
 RESET_TOKEN_HOURS = int(os.getenv("RESET_TOKEN_HOURS", "1"))
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login-swagger")
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):

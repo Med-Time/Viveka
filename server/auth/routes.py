@@ -28,6 +28,18 @@ def login(req: LoginRequest):
     user_out = UserOut(id=user["id"], email=user["email"], full_name=user.get("full_name"))
     return TokenResponse(access_token=token, user=user_out), {"refresh_token": refresh}
 
+
+# In routes.py
+from fastapi import Form
+
+@router.post("/login-swagger")
+def login_swagger(username: str = Form(...), password: str = Form(...)):
+    user = services.authenticate_user(username.lower(), password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = services.create_access_token({"sub": user["id"], "email": user["email"]})
+    return {"access_token": token, "token_type": "bearer"}
+
 # NOTE: above login returned a tuple; better to return combined response
 # @router.post("/login2", response_model=RefreshResponse)
 # def login2(req: LoginRequest):
