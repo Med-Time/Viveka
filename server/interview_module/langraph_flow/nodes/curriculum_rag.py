@@ -64,6 +64,6 @@ def generate_curriculum_rag(state):
     """
     response = structured_llm.invoke(prompt)
     state.curriculum = response.curriculum
-    save_curriculum(state.session_id, state.curriculum)
+    save_curriculum(state.study_id, state.curriculum)
     print(f"Curriculum: {response.curriculum}")
     return state

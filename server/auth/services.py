@@ -84,6 +84,7 @@ def get_user_by_email(email: str):
         "email": doc.get("email"),
         "password": doc.get("password"),
         "full_name": doc.get("name"),
+        "studies": doc.get("studies", []),
         "_raw": doc,
     }
 
@@ -121,8 +122,6 @@ def create_access_token(data: dict, expires_minutes: int = JWT_EXP_MIN):
     token = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALG)
     # pyjwt returns str in modern versions
     print(token)
-    if token is None:
-        return "Tokennotworking"
     return token
 
 # ---------------- Refresh token helpers ----------------

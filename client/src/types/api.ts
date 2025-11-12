@@ -1,4 +1,4 @@
-export type QuestionType = "mcq" | "open" | "fill";
+export type QuestionType = "mcq" | "detailed_answer" | "fill_in_the_blanks" | "one_word_answer";
 
 export interface StartInterviewRequest {
   user_id: string;
@@ -10,37 +10,35 @@ export interface StartInterviewRequest {
 }
 
 export interface StartInterviewResponse {
-  session_id: string;
-  question: {
-    id: string;
-    type: QuestionType;
-    prompt: string;
-    options?: string[];        // for mcq
-    blanks?: number;           // for fill
-  } | null;
+  status: string;
+  study_id: string;
+  type: QuestionType;
+  question: string;
+  concept?: string;
+  
 }
 
 export interface AnswerInterviewRequest {
-  session_id: string;
-  question_id: string;
-  answer: string | string[];  // text, mcq option key(s), or blanks joined
+  user_id: string;
+  answer: string;
 }
 
 export interface AnswerInterviewResponse {
-  evaluation?: {
-    correctness?: "correct" | "partial" | "incorrect";
-    score?: number;            // 0-1
-    feedback?: string;
-  };
-  next_question?: StartInterviewResponse["question"] | null;
-  completed: boolean;
+  score?: number;
+  question: StartInterviewResponse;
 }
 
 export interface PersonaReport {
-  session_id: string;
-  summary: string;
-  traits: Array<{ key: string; value: string }>;
-  recommended_level?: string;
+  type: string;
+  created_at: Date;
+  learner_profile_summary: string;
+  learning_style_assessment: string[];
+  strengths: string[];
+  weaknesses_and_gaps: string[];
+  common_misconceptions: string[];
+  engagement_and_confidence: string;
+  actionable_learning_recommendations: string[];
+  preliminary_personalized_roadmap_suggestions: string[];
 }
 
 export interface LessonPlanItem {
@@ -62,7 +60,7 @@ export interface LessonPlan {
 };
 
 export interface ChapterContent {
-  session_id: string;
+  study_id: string;
   chapter_idx: number;
   chapter_title: string;
   generated_content: Record<string, string>;
@@ -85,10 +83,12 @@ export interface Chapter {
 
 export interface AuthResponse {
   token: string;
+  token_type: string;
   user: {
     id: string;
     email: string;
-    name?: string;
+    full_name?: string;
+    studies?: string[];
   };
 }
 

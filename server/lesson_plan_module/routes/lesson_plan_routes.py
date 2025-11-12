@@ -4,7 +4,6 @@ from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
 from lesson_plan_module.core.mongo_fetch import fetch_lesson_plan
 from interview_module.services.mongo_persistence import save_lesson_plan
 from lesson_plan_module.langraph_flow.lesson_plan import xlesson_plan_graph
-from datetime import datetime
 
 router = APIRouter(
     prefix="/lesson-plan",
@@ -12,14 +11,14 @@ router = APIRouter(
 )
 
 
-@router.get("/generate/{session_id}")
-async def generate_lesson_plan(session_id: str):
+@router.get("/generate/{study_id}")
+async def generate_lesson_plan(study_id: str):
     """
     Generate a lesson plan for a specific session and save it to the database.
     """
     # 1. Get session data
     try:
-        session_data = sessions_col.find_one({"_id": ObjectId(session_id)})
+        session_data = sessions_col.find_one({"_id": ObjectId(study_id)})
         if not session_data:
             raise HTTPException(status_code=404, detail=f"Session not found")
         session_data["_id"] = str(session_data["_id"])
@@ -29,7 +28,7 @@ async def generate_lesson_plan(session_id: str):
     # 2. Get persona report
     try:
         persona_report = persona_col.find_one(
-            {"session_id": session_id},
+            {"study_id": study_id},
             sort=[("created_at", -1)]
         )
         if not persona_report:
@@ -42,7 +41,7 @@ async def generate_lesson_plan(session_id: str):
     # 3. Get Q&A and feedback history
     try:
         qa_history = list(qa_col.find(
-            {"session_id": session_id},
+            {"study_id": study_id},
             {
                 "concept": 1,
                 "question": 1,
@@ -62,7 +61,7 @@ async def generate_lesson_plan(session_id: str):
 
     # 4. Prepare state for lesson plan generation
     state = {
-        "session_id": session_id,
+        "study_id": study_id,
         "user_id": session_data.get("user_id"),
         "subject": session_data.get("subject"),
         "goal": session_data.get("goal"),
@@ -97,7 +96,7 @@ async def generate_lesson_plan(session_id: str):
                 }
 
         response_data = {
-            "session_id": session_id,
+            "study_id": study_id,
             "user_id": session_data.get("user_id"),
             "subject": session_data.get("subject"),
             "goal": session_data.get("goal"),
@@ -112,7 +111,7 @@ async def generate_lesson_plan(session_id: str):
         
         # 7. Save lesson plan to MongoDB
         try:
-            lesson_plan_id = save_lesson_plan(session_id, response_data)
+            lesson_plan_id = save_lesson_plan(study_id, response_data)
             response_data["lesson_plan_id"] = lesson_plan_id
             print(f"✅ Lesson plan saved with ID: {lesson_plan_id}")
         except Exception as e:
@@ -126,25 +125,25 @@ async def generate_lesson_plan(session_id: str):
         raise HTTPException(status_code=500, detail=f"Error generating lesson plan: {str(e)}")
 
 
-@router.get("/{session_id}")
-async def get_lesson_plan(session_id: str):
+@router.get("/{study_id}")
+async def get_lesson_plan(study_id: str):
     """
     Retrieve the saved lesson plan for a specific session.
     """
     try:
         # Get the saved lesson plan
-        lesson_plan = fetch_lesson_plan(session_id)
+        lesson_plan = fetch_lesson_plan(study_id)
         
         if not lesson_plan:
             # Check if session exists
-            session_exists = sessions_col.find_one({"_id": ObjectId(session_id)})
+            session_exists = sessions_col.find_one({"_id": ObjectId(study_id)})
             
             if not session_exists:
-                raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+                raise HTTPException(status_code=404, detail=f"Session {study_id} not found")
             else:
                 raise HTTPException(
                     status_code=404, 
-                    detail=f"No lesson plan found for session {session_id}. Generate one first."
+                    detail=f"No lesson plan found for session {study_id}. Generate one first."
                 )
         
         return lesson_plan

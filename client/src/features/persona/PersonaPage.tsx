@@ -10,7 +10,7 @@ import { queryKeys } from "@/api/queryKeys";
 
 export const PersonaPage = () => {
   const navigate = useNavigate();
-  const sessionId = localStorage.getItem("session_id") || "";
+  const sessionId = localStorage.getItem("current_study_id") || "";
 
   const { data: persona, isLoading } = useQuery({
     queryKey: queryKeys.persona(sessionId),

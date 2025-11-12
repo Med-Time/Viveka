@@ -12,22 +12,22 @@ router = APIRouter(
     tags=["content"]
 )
 
-@router.get("/generate/{session_id}/{chapter_idx}")
-async def generate_content_route(session_id: str, chapter_idx: int):
+@router.get("/generate/{study_id}/{chapter_idx}")
+async def generate_content_route(study_id: str, chapter_idx: int):
     """
     Generate content for a specific chapter and save it to the database.
     """
     try:
-        session_data = sessions_col.find_one({"_id": ObjectId(session_id)})
-        if not session_data:
-            raise HTTPException(status_code=404, detail="Session not found")
-        session_data["_id"] = str(session_data["_id"])
+        study_data = sessions_col.find_one({"_id": ObjectId(study_id)})
+        if not study_data:
+            raise HTTPException(status_code=404, detail="study not found")
+        study_data["_id"] = str(study_data["_id"])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid session ID: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid study ID: {str(e)}")
     
     state = ContentInput(
-        session_id=session_id,
-        user_id=session_data.get("user_id"),
+        study_id=study_id,
+        user_id=study_data.get("user_id"),
         chapter_idx=chapter_idx,
         chapter_title="",
         subtopic_title="",
@@ -41,22 +41,21 @@ async def generate_content_route(session_id: str, chapter_idx: int):
     )
 
     
-    print(f"Starting content generation for session: {session_id}, chapter: {chapter_idx}")
+    print(f"Starting content generation for study: {study_id}, chapter: {chapter_idx}")
     try:
         result = graph.invoke(state)
 
         response_data = ContentResponse(
-            session_id=session_id,
-            user_id= session_data.get("user_id"),
+            study_id=study_id,
+            user_id= study_data.get("user_id"),
             chapter_idx= chapter_idx,
             chapter_title= result["chapter_title"],
             generated_content= result["generated_content"],
-            created_at=datetime.now()
         )
 
         response = response_data.model_dump()
         try:
-            content_id = save_generated_content(session_id, response_data)
+            content_id = save_generated_content(response_data)
             response["content_id"] = content_id
             print(f'Response data: {response}')
         except Exception as e:
@@ -69,45 +68,46 @@ async def generate_content_route(session_id: str, chapter_idx: int):
 
 
 
-# @router.get("/generate/{session_id}/{chapter_idx}")
-# async def generate_content_route(session_id: str, chapter_idx: int):
+# @router.get("/generate/{study_id}/{chapter_idx}")
+# async def generate_content_route(study_id: str, chapter_idx: int):
 #     data = ContentResponse(
 #         created_at=datetime.now(),
-#         session_id=session_id,
+#         study_id=study_id,
 #         user_id="user_placeholder",
 #         chapter_idx=chapter_idx,
 #         chapter_title="Chapter Placeholder",
 #         generated_content={"Subtopic Placeholder": "Generated content goes here."}
 #     )
-#     save_generated_content(session_id, data)
+#     save_generated_content(study_id, data)
 #     return {"message": "Content generation initiated. Please check back later to retrieve the content."}
 
-@router.get("/{session_id}/{chapter_idx}")
-async def get_generated_content(session_id: str, chapter_idx: int):
+@router.get("/{study_id}/{chapter_idx}")
+async def get_generated_content(study_id: str, chapter_idx: int):
     """
-    Retrieve the saved content for a specific session and chapter.
+    Retrieve the saved content for a specific study and chapter.
     """
     try:
-        content = fetch_generated_content(session_id, chapter_idx)
+        content = fetch_generated_content(study_id, chapter_idx)
         if not content:
             raise HTTPException(status_code=404, detail="No content found. Generate first.")
         content.pop("_id", None)  # Remove MongoDB internal ID
+        content.pop("created_at", None)  # Remove created_at if not needed
         response_data = ContentResponse(**content)
         return response_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving content: {str(e)}")
     
-@router.get("/{session_id}/{chapter_idx}/{index}")
-async def get_generated_content_by_subtopic(session_id: str, chapter_idx: int, index: int):
+@router.get("/{study_id}/{chapter_idx}/{index}")
+async def get_generated_content_by_subtopic(study_id: str, chapter_idx: int, index: int):
     """
-    Retrieve the saved content for a specific session, chapter, and subtopic index.
+    Retrieve the saved content for a specific study, chapter, and subtopic index.
     """
     try:
-        content = fetch_generated_content(session_id, chapter_idx)
+        content = fetch_generated_content(study_id, chapter_idx)
         if not content:
             raise HTTPException(status_code=404, detail="No content found. Generate first.")
         content.pop("_id", None)  # Remove MongoDB internal ID
-
+        content.pop("created_at", None)  # Remove created_at if not needed
         response_data = ContentResponse(**content)
         generated_list = response_data.generated_content  # List[SubtopicContent]
 

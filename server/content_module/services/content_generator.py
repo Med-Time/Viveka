@@ -11,28 +11,28 @@ _content_cache = {}
 _cache_lock = threading.Lock()
 
 
-def _cache_key(session_id, chapter_title, subtopic_title):
-    return f"{session_id}:{chapter_title}:{subtopic_title}"
+def _cache_key(study_id, chapter_title, subtopic_title):
+    return f"{study_id}:{chapter_title}:{subtopic_title}"
 
 
-def fetch_persona_and_lesson(session_id, user_id=None):
-    """Fetch persona report and lesson plan from MongoDB for a given session_id (and optional user_id)."""
+def fetch_persona_and_lesson(study_id, user_id=None):
+    """Fetch persona report and lesson plan from MongoDB for a given study_id (and optional user_id)."""
     # Fetch persona report
-    print(f"Fetching persona for session_id: {session_id}")
-    query = {"session_id": session_id}
+    print(f"Fetching persona for study_id: {study_id}")
+    query = {"study_id": study_id}
     # if user_id:
     #     query["user_id"] = user_id
     persona = persona_col.find_one(query)
     print(f"Persona fetched: {persona}")
     if not persona:
-        raise ValueError("Persona report not found for session_id")
-    print(f"Fetched persona for session_id: {session_id}")
+        raise ValueError("Persona report not found for study_id")
+    print(f"Fetched persona for study_id: {study_id}")
     # Fetch lesson plan
     lesson_plan = lesson_plans.find_one(query)
     if not lesson_plan:
-        raise ValueError("Lesson plan not found for session_id")
+        raise ValueError("Lesson plan not found for study_id")
     
-    print(f"Fetched lesson plan for session_id: {session_id}")
+    print(f"Fetched lesson plan for study_id: {study_id}")
 
     # Remove MongoDB's _id field if present
     persona.pop("_id", None)
@@ -170,7 +170,7 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
 
 #         # If no regen required, try cache or reuse previous
 #         if not should_regen:
-#             cached = get_cached_content(state.session_id, chapter_title, subtopic_title)
+#             cached = get_cached_content(state.study_id, chapter_title, subtopic_title)
 #             if cached:
 #                 print(f"[Regenerator] Using cached content for {subtopic_title}")
 #                 new_generated[subtopic_title] = cached
@@ -198,7 +198,7 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
 
 #         # Persist regenerated content
 #         try:
-#             store_generated_content(state.session_id, chapter_title, subtopic_title, content)
+#             store_generated_content(state.study_id, chapter_title, subtopic_title, content)
 #         except Exception as e:
 #             print(f"[Regenerator] Warning: failed to store regenerated content for {subtopic_title}: {e}")
 
@@ -212,35 +212,35 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
 #     print(f"[Regenerator] ✅ Regeneration complete for chapter: {chapter_title}")
 #     return state
 
-def store_generated_content(session_id, chapter_title, subtopic_title, content):
+def store_generated_content(study_id, chapter_title, subtopic_title, content):
     """Store generated content in MongoDB and in-memory cache. Upsert if already exists."""
     doc = {
-        "session_id": session_id,
+        "study_id": study_id,
         "chapter_title": chapter_title,
         "subtopic_title": subtopic_title,
         "content": content
     }
     content_col.update_one(
-        {"session_id": session_id, "chapter_title": chapter_title, "subtopic_title": subtopic_title},
+        {"study_id": study_id, "chapter_title": chapter_title, "subtopic_title": subtopic_title},
         {"$set": doc},
         upsert=True
     )
     # Store in in-memory cache
-    key = _cache_key(session_id, chapter_title, subtopic_title)
+    key = _cache_key(study_id, chapter_title, subtopic_title)
     with _cache_lock:
         _content_cache[key] = content
     print(f"Stored content for {subtopic_title} in DB and cache.")
 
 
-def get_cached_content(session_id, chapter_title, subtopic_title):
+def get_cached_content(study_id, chapter_title, subtopic_title):
     """Retrieve cached content from in-memory cache or MongoDB."""
-    key = _cache_key(session_id, chapter_title, subtopic_title)
+    key = _cache_key(study_id, chapter_title, subtopic_title)
     with _cache_lock:
         if key in _content_cache:
             return _content_cache[key]
     # If not in cache, fetch from MongoDB and update cache
     doc = content_col.find_one({
-        "session_id": session_id,
+        "study_id": study_id,
         "chapter_title": chapter_title,
         "subtopic_title": subtopic_title
     })
@@ -251,19 +251,19 @@ def get_cached_content(session_id, chapter_title, subtopic_title):
     return None
 
 
-def main(session_id, chapter_idx=0):
-    persona, lesson_plan = fetch_persona_and_lesson(session_id)
+def main(study_id, chapter_idx=0):
+    persona, lesson_plan = fetch_persona_and_lesson(study_id)
     subtopics = get_subtopics(lesson_plan, chapter_idx)
     chapter_title = lesson_plan["lesson_plan"]["chapters"][chapter_idx]["chapter_title"]
 
     for subtopic in subtopics:
         subtopic_title = subtopic["sub_topic_title"]
-        cached = get_cached_content(session_id, chapter_title, subtopic_title)
+        cached = get_cached_content(study_id, chapter_title, subtopic_title)
         if cached:
             print(f"Using cached content for {subtopic_title}")
             continue
         content = generate_content(persona, lesson_plan, subtopic, chapter_title, feedback=None)
-        store_generated_content(session_id, chapter_title, subtopic_title, content)
+        store_generated_content(study_id, chapter_title, subtopic_title, content)
         print(f"Generated and stored content for {subtopic_title}.md")
 
 

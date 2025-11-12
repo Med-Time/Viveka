@@ -7,6 +7,13 @@ from auth.routes import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from auth.services import get_current_user
 
+# app = FastAPI()
+# app.include_router(migrate_router)
+# app.include_router(auth_router)
+# app.include_router(interview_router, dependencies=[Depends(get_current_user)], prefix="/interview", tags=["interview"])
+# app.include_router(lesson_plan_router, dependencies=[Depends(get_current_user)])
+# app.include_router(content_router, dependencies=[Depends(get_current_user)])
+
 app = FastAPI()
 app.include_router(migrate_router)
 app.include_router(auth_router)

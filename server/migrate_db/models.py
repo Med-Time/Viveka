@@ -12,7 +12,7 @@ from bson import ObjectId
 class QAHistoryModel(BaseModel):
     """
     A single Q&A item. 
-    Cleaned of _id and session_id.
+    Cleaned of _id and study_id.
     """
     concept: Optional[str] = None
     question: Optional[str] = None
@@ -27,7 +27,7 @@ class QAHistoryModel(BaseModel):
 class PersonaReportModel(BaseModel):
     """
     The persona report.
-    Cleaned of _id and session_id.
+    Cleaned of _id and study_id.
     """
     type: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -45,7 +45,7 @@ class PersonaReportModel(BaseModel):
 class GeneratedLessonPlanModel(BaseModel):
     """
     The generated lesson plan.
-    Cleaned of _id, session_id, user_id, subject, goal, level,
+    Cleaned of _id, study_id, user_id, subject, goal, level,
     persona_report_id, and qa_history_ids.
     """
     created_at: Optional[datetime] = None
@@ -62,7 +62,7 @@ class StudyModel(BaseModel):
     This is the core "Study" or "Session" object.
     It contains all related data for one interview session.
     """
-    study_id: str = Field(..., description="The original session_id")
+    study_id: str = Field(..., description="The original study_id")
     subject: Optional[str] = None
     goal: Optional[str] = None
     level: Optional[str] = None

@@ -18,9 +18,6 @@ export const useAuth = () => {
   }, []);
 
   const login = (authData: AuthResponse) => {
-    console.log("Logging in user:", authData.token);
-    localStorage.setItem("auth_token", authData.token);
-    localStorage.setItem("user", JSON.stringify(authData.user));
     setToken(authData.token);
     setUser(authData.user);
   };
@@ -28,7 +25,8 @@ export const useAuth = () => {
   const logout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user");
-    localStorage.removeItem("session_id");
+    localStorage.removeItem("study_id");
+    localStorage.removeItem("current_study_id");
     setToken(null);
     setUser(null);
   };
