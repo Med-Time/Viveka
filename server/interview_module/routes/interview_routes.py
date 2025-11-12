@@ -120,7 +120,8 @@ def answer_question(data: AnswerInput):
         "type": updated_state.get("current_question_type"),
         "question": updated_state["current_question"],
         "concept": updated_state["curriculum"][updated_state["current_concept_index"]],
-        "score": updated_state["score_history"][-1]
+        "score": updated_state["score_history"][-1],
+        "feedback": updated_state.get("feedback_history", [])[-1] if updated_state.get("feedback_history") else None,
     }
 
 

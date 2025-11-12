@@ -25,20 +25,17 @@ export const InterviewPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Expect the onboarding page to pass this:
-  // navigate("/interview", { state: { start: startResponse } })
+  // may be passed from onboarding: navigate("/interview", { state: { start } })
   const startFromState = (location.state as LocationState | null)?.start || null;
 
-  // If user directly lands on this page (no state), ask them to start onboarding
+  // If user directly lands here without starting onboarding, show call-to-action
   if (!startFromState) {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader />
         <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <Card className="p-6 text-center space-y-4">
-            <p className="text-muted-foreground">
-              You haven’t started an assessment yet.
-            </p>
+            <p className="text-muted-foreground">You haven't started an assessment yet.</p>
             <Button onClick={() => navigate("/onboarding")}>Start Assessment</Button>
           </Card>
         </div>
@@ -50,72 +47,118 @@ export const InterviewPage = () => {
   const [questionNumber, setQuestionNumber] = useState(1);
   const [score, setScore] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [feedback, setFeedback] = useState<string[] | null>(null);
 
   const storedUser = safeGetJson("user");
   const userId =
     storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
 
-  const answerMutation = useMutation<
-    AnswerInterviewResponse,
-    unknown,
-    { answer: string }
-  >({
-    mutationFn: ({ answer }) => {
-      if (!userId) {
-        return Promise.reject(new Error("Missing user_id"));
-      }
-      // API requires only { user_id, answer }
-      return interviewApi.answer({
-        user_id: userId,
-        answer,
-      });
-    },
-    onSuccess: (data) => {
-      setScore(typeof data.score === "number" ? data.score : null);
-      setShowResult(true);
-
-      // Backend returns the next question in data.question (type: StartInterviewResponse)
-      // We won’t immediately switch — we show a Continue button.
-      if (!data.question) {
-        toast({
-          title: "Answer recorded",
-          description: "Proceed when ready.",
+  const answerMutation = useMutation<AnswerInterviewResponse, unknown, { answer: string }>(
+    {
+      mutationFn: ({ answer }) => {
+        if (!userId) {
+          return Promise.reject(new Error("Missing user_id"));
+        }
+        return interviewApi.answer({
+          user_id: userId,
+          answer,
         });
-      }
-    },
-    onError: (err) => {
-      toast({
-        title: "Could not submit answer",
-        description: err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+      },
+      onSuccess: (data) => {
+        // If backend indicates flow finished
+        if (data.status === "done") {
+          const final = typeof data.final_score === "number" ? data.final_score : null;
+          setScore(final);
+          setFeedback(data.feedback ?? null);
+          setShowResult(true);
+
+          toast({
+            title: "Assessment complete",
+            description: "Generating your persona report.",
+          });
+
+          // Save study_id if backend returned one and navigate to persona page
+          if (data.study_id) localStorage.setItem("current_study_id", data.study_id);
+          navigate("/persona");
+          return;
+        }
+
+        // In-flow response
+        setScore(typeof data.score === "number" ? data.score : null);
+        setFeedback(data.feedback ?? null);
+        setShowResult(true);
+
+        // store study_id if present
+        if (data.study_id) {
+          localStorage.setItem("current_study_id", data.study_id);
+        }
+
+        if (!data.question) {
+          toast({
+            title: "Answer recorded",
+            description: "Proceed when ready.",
+          });
+        }
+      },
+      onError: (err) => {
+        toast({
+          title: "Could not submit answer",
+          description: err instanceof Error ? err.message : "Please try again.",
+          variant: "destructive",
+        });
+      },
+    }
+  );
 
   const handleSubmitAnswer = (answer: string | string[]) => {
     const answerValue = Array.isArray(answer) ? answer.join(", ") : answer;
     setShowResult(false);
     setScore(null);
+    setFeedback(null);
     answerMutation.mutate({ answer: answerValue });
   };
 
   const handleContinue = () => {
     const next = answerMutation.data?.question;
     if (next) {
-      setCurrent(next);
+      // next is a string (question) plus metadata in other fields — build a new StartInterviewResponse-like object
+      const nextObj: StartInterviewResponse = {
+        status: "ok",
+        study_id: answerMutation.data?.study_id || current.study_id,
+        type: (answerMutation.data?.type as QuestionType) || current.type,
+        question: answerMutation.data?.question || "",
+        concept: answerMutation.data?.concept || undefined,
+      };
+
+      setCurrent(nextObj);
       setQuestionNumber((n) => n + 1);
       setShowResult(false);
       setScore(null);
+      setFeedback(null);
+
+      if (nextObj.study_id) {
+        localStorage.setItem("current_study_id", nextObj.study_id);
+      }
     } else {
-      // If backend eventually ends the flow (not in types), send user to persona
+      // No next question returned — route to persona (or fallback)
       navigate("/persona");
     }
   };
 
-  const qType: QuestionType = current.type;
-  const prompt = current.question; // string per API
+  const qType: QuestionType = current.type as QuestionType;
+  const prompt = current.question; // string per backend
   const concept = current.concept; // optional hint
   const studyId = current.study_id;
+
+  // Utility to render score as percentage regardless of backend format
+  const formatScorePercent = (s: number | null) => {
+    if (s === null || s === undefined) return null;
+    // If between 0 and 1 treat as fraction
+    if (s >= 0 && s <= 1) return Math.round(s * 100);
+    return Math.round(s);
+  };
+
+  const percent = formatScorePercent(score);
 
   return (
     <div className="min-h-screen bg-background">
@@ -133,7 +176,7 @@ export const InterviewPage = () => {
             <span className="font-medium">Progress</span>
             <span className="text-muted-foreground">Question {questionNumber}</span>
           </div>
-          <Progress value={questionNumber * 10} className="h-2" />
+          <Progress value={Math.min(questionNumber * 10, 100)} className="h-2" />
         </div>
 
         {/* Result / score card */}
@@ -144,21 +187,39 @@ export const InterviewPage = () => {
               <div className="flex-1">
                 <div className="mb-2 flex items-center gap-2">
                   <span className="font-semibold">Answer submitted</span>
-                  {typeof score === "number" && (
-                    <Badge variant="secondary">{Math.round(score * 100)}%</Badge>
+                  {percent !== null && (
+                    <Badge variant="secondary">{percent}%</Badge>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {typeof score === "number"
-                    ? "Score reflects how well your answer matched the expected response."
-                    : "Your response has been recorded."}
-                </p>
+
+                {feedback && feedback.length > 0 ? (
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    {feedback.map((f, i) => (
+                      <p key={i}>{f}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {percent !== null
+                      ? "Score reflects how well your answer matched the expected response."
+                      : "Your response has been recorded."}
+                  </p>
+                )}
               </div>
             </div>
 
-            {answerMutation.data?.question && (
+            {answerMutation.data?.question ? (
               <Button onClick={handleContinue} className="mt-4 w-full">
                 Continue to Next Question
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  navigate("/persona");
+                }}
+                className="mt-4 w-full"
+              >
+                View Persona Report
               </Button>
             )}
           </Card>
@@ -167,8 +228,6 @@ export const InterviewPage = () => {
         {/* Question */}
         {!showResult && (
           <>
-            {/* Your API doesn’t provide MCQ options or blanks in the type definitions,
-                so we use OpenQuestion for all types. */}
             <OpenQuestion
               id={`${studyId}-${questionNumber}`}
               prompt={prompt}

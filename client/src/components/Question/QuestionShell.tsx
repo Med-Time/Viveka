@@ -12,8 +12,9 @@ interface QuestionShellProps {
 export const QuestionShell = ({ type, prompt, questionNumber, children }: QuestionShellProps) => {
   const typeLabels: Record<QuestionType, string> = {
     mcq: "Multiple Choice",
-    open: "Open Ended",
-    fill: "Fill in the Blanks",
+    detailed_answer: "Open Ended",
+    fill_in_the_blanks: "Fill in the Blanks",
+    one_word_answer: "One Word Answer",
   };
 
   return (

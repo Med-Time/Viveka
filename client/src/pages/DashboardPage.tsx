@@ -48,13 +48,19 @@ export const DashboardPage = () => {
     lastRead = null;
   }
 
-  const canContinue =
-    lastRead && lastRead.study_id && currentStudyId && lastRead.study_id === currentStudyId;
+  const allLastReads = safeGetJson("last_read") || [];
+  const currentLastRead =
+    Array.isArray(allLastReads)
+      ? allLastReads.find((item) => item.study_id === currentStudyId)
+      : allLastReads && allLastReads.study_id === currentStudyId
+      ? allLastReads
+      : null;
+
+  const canContinue = Boolean(currentLastRead && currentStudyId);
 
   const handleSelectStudy = (studyId: string) => {
     if (!studyId) return;
     localStorage.setItem("current_study_id", studyId);
-    // keep only current_study_id in storage (no user/session ids here)
     setCurrentStudyId(studyId);
     setShowStudySelector(false);
   };
@@ -124,40 +130,24 @@ export const DashboardPage = () => {
         )}
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Start a new course (onboarding) */}
           <Card className="transition-shadow hover:shadow-md">
             <CardHeader>
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                 <Target className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle>Start Onboarding</CardTitle>
-              <CardDescription>Tell us about your learning goals and preferences</CardDescription>
+              <CardTitle>Start a New Course</CardTitle>
+              <CardDescription>Create a course and set your learning preferences</CardDescription>
             </CardHeader>
             <CardContent>
               <Button onClick={() => navigate("/onboarding")} className="w-full gap-2">
                 <Play className="h-4 w-4" />
-                Begin Setup
+                Create Course
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader>
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
-                <Brain className="h-6 w-6 text-secondary" />
-              </div>
-              <CardTitle>Take Assessment</CardTitle>
-              <CardDescription>
-                Complete our adaptive assessment to personalize your learning
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => navigate("/interview")} className="w-full gap-2">
-                <Play className="h-4 w-4" />
-                Start Assessment
-              </Button>
-            </CardContent>
-          </Card>
-
+          {/* Removed direct "Start Assessment" action — replaced with access to View Profile / Lesson Plan */}
           {currentStudyId && (
             <>
               <Card className="transition-shadow hover:shadow-md">
@@ -219,10 +209,10 @@ export const DashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="mb-2 text-sm text-muted-foreground">
-                  {lastRead.chapterTitle ? lastRead.chapterTitle : `Chapter ${lastRead.chapterIdx}`}
-                  {lastRead.subtopicTitle
+                  {lastRead?.chapterTitle ? lastRead.chapterTitle : `Chapter ${lastRead?.chapterIdx}`}
+                  {lastRead?.subtopicTitle
                     ? ` — ${lastRead.subtopicTitle}`
-                    : ` — Subtopic ${lastRead.subtopicIdx + 1}`}
+                    : ` — Subtopic ${((lastRead?.subtopicIdx ?? 0) + 1)}`}
                 </div>
                 <Button
                   onClick={() => navigate(`/content/${lastRead.chapterIdx}/${lastRead.subtopicIdx}`)}
@@ -241,7 +231,7 @@ export const DashboardPage = () => {
             <CardHeader>
               <CardTitle>Get Started</CardTitle>
               <CardDescription>
-                Complete the onboarding and assessment to unlock your personalized learning experience
+                Create a course to begin your personalized learning experience
               </CardDescription>
             </CardHeader>
             <CardContent>

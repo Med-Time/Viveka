@@ -10,12 +10,12 @@ export interface StartInterviewRequest {
 }
 
 export interface StartInterviewResponse {
-  status: string;
+  status: "ok" | "error" | "done";
+  message?: string;
   study_id: string;
-  type: QuestionType;
-  question: string;
+  type?: QuestionType;
+  question?: string;
   concept?: string;
-  
 }
 
 export interface AnswerInterviewRequest {
@@ -24,13 +24,23 @@ export interface AnswerInterviewRequest {
 }
 
 export interface AnswerInterviewResponse {
+  status: "ok" | "error" | "done";
+  study_id?: string;
   score?: number;
-  question: StartInterviewResponse;
+  type?: QuestionType;
+  question?: string;
+  concept?: string;
+  message?: string;
+  feedback?: string[];
+  final_score?: number;
+  summary?: string;
 }
 
 export interface PersonaReport {
+  _id: string;
+  study_id: string;
   type: string;
-  created_at: Date;
+  created_at: string | Date;
   learner_profile_summary: string;
   learning_style_assessment: string[];
   strengths: string[];
@@ -39,6 +49,11 @@ export interface PersonaReport {
   engagement_and_confidence: string;
   actionable_learning_recommendations: string[];
   preliminary_personalized_roadmap_suggestions: string[];
+}
+
+export interface PersonaGetResponse {
+  status: "success" | "error";
+  data: PersonaReport;
 }
 
 export interface LessonPlanItem {

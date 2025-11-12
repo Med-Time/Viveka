@@ -9,6 +9,7 @@ interface OpenQuestionProps {
   questionNumber?: number;
   onSubmit: (answer: string) => void;
   disabled?: boolean;
+  hint?: string;
 }
 
 export const OpenQuestion = ({
@@ -17,9 +18,10 @@ export const OpenQuestion = ({
   questionNumber,
   onSubmit,
   disabled,
+  hint,
 }: OpenQuestionProps) => {
   const [answer, setAnswer] = useState("");
-  const wordCount = answer.trim().split(/\s+/).filter(Boolean).length;
+  const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
 
   const handleSubmit = () => {
     if (answer.trim()) {
@@ -28,8 +30,16 @@ export const OpenQuestion = ({
   };
 
   return (
-    <QuestionShell type="open" prompt={prompt} questionNumber={questionNumber}>
+    <QuestionShell type="detailed_answer" prompt={prompt} questionNumber={questionNumber}>
       <div className="space-y-4">
+        {/* Render hint if provided */}
+        {hint && (
+          <div className="rounded-md border border-border bg-muted/5 p-3 text-sm text-muted-foreground">
+            <strong className="mr-1">Hint:</strong>
+            <span>{hint}</span>
+          </div>
+        )}
+
         <Textarea
           id={id}
           value={answer}
@@ -39,10 +49,12 @@ export const OpenQuestion = ({
           rows={6}
           className="resize-none"
         />
+
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{wordCount} words</span>
         </div>
       </div>
+
       <Button
         onClick={handleSubmit}
         disabled={!answer.trim() || disabled}

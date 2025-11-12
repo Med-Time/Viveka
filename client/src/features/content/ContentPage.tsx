@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut } from "lucide-react"
 import { contentApi } from "./content.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
-import { safeGetJson } from "@/utils/storage";
+import { safeGetJson, safeSetJson } from "@/utils/storage";
 import Assistant from '../ai_assistant/assistant';
 import Assistant_style from "../ai_assistant/assistant_style.module.css"
 
@@ -184,7 +184,7 @@ export const ContentPage = () => {
     // update last_read before navigation
     try {
       const payload = {
-        studyID,
+        study_id: currentStudyId,
         chapterIdx,
         subtopicIdx: idx,
         chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
@@ -224,22 +224,61 @@ export const ContentPage = () => {
   };
 
   // also persist when user marks complete or navigates next/previous
-  const handleComplete = () => {
-    try {
-      const payload = {
-        studyID,
-        chapterIdx,
-        subtopicIdx: currentIdx,
-        chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
-        subtopicTitle: currentTitle,
-      };
-      localStorage.setItem("last_read", JSON.stringify(payload));
-    } catch {}
+const handleComplete = () => {
+  const studyID = currentStudyId;
+  if (!studyID) {
     toast({
-      title: "Subtopic completed!",
-      description: "Great progress! Keep learning.",
+      title: "Error",
+      description: "Missing study ID — please select a study first.",
+      variant: "destructive",
     });
+    return;
+  }
+
+  const newEntry = {
+    study_id: studyID,
+    chapterIdx,
+    subtopicIdx: currentIdx,
+    chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
+    subtopicTitle: currentTitle,
   };
+
+  // Safely read current last_read data
+  const existingData = safeGetJson("last_read");
+
+  let updatedData: any[] = [];
+
+  if (Array.isArray(existingData)) {
+    // Check if this study already exists
+    const index = existingData.findIndex((item) => item.study_id === studyID);
+    if (index !== -1) {
+      // Overwrite the existing record
+      existingData[index] = newEntry;
+      updatedData = existingData;
+    } else {
+      // Append new study progress
+      updatedData = [...existingData, newEntry];
+    }
+  } else if (existingData && typeof existingData === "object" && existingData.study_id) {
+    // Old format (single object) — migrate to array
+    if (existingData.study_id === studyID) {
+      updatedData = [newEntry];
+    } else {
+      updatedData = [existingData, newEntry];
+    }
+  } else {
+    // No existing data — create new entry
+    updatedData = [newEntry];
+  }
+
+  // Persist safely
+  safeSetJson("last_read", updatedData);
+
+  toast({
+    title: "Progress saved!",
+    description: `Marked complete: ${newEntry.subtopicTitle}`,
+  });
+};
 
   const [assistantOpen, setAssistantOpen] = useState(false);
 

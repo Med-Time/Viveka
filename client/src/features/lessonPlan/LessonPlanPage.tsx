@@ -80,9 +80,6 @@ export const LessonPlanPage = () => {
   }
 
   const sessionId = currentStudyId;
-  console.log("User study id:", sessionId);
-  console.log("Token:", token);
-
   const [hasGenerated, setHasGenerated] = useState(false);
 
   // First: check whether a lesson plan already exists for this study.
@@ -97,7 +94,6 @@ export const LessonPlanPage = () => {
         if (mounted) setHasGenerated(true);
       } catch (err) {
         // If not found or error, we keep hasGenerated=false so UI shows generate button
-        console.log("No existing lesson plan for study:", sessionId);
       }
     })();
     return () => {
@@ -114,7 +110,6 @@ export const LessonPlanPage = () => {
   const generateMutation = useMutation({
     mutationFn: () => lessonPlanApi.generate(sessionId),
     onSuccess: () => {
-      console.log("Lesson plan generation started");
       setHasGenerated(true);
       toast({
         title: "Generating your lesson plan",

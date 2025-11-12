@@ -38,7 +38,7 @@ export const FillBlanksQuestion = ({
   const allFilled = answers.every((a) => a.trim() !== "");
 
   return (
-    <QuestionShell type="fill" prompt={prompt} questionNumber={questionNumber}>
+    <QuestionShell type="fill_in_the_blanks" prompt={prompt} questionNumber={questionNumber}>
       <div className="space-y-4">
         {Array.from({ length: blanks }).map((_, idx) => (
           <div key={idx}>
