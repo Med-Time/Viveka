@@ -87,7 +87,7 @@ def run_persona(state):
     state.persona_summary = persona # Ensure you're storing the full PersonaSummary object
     print(f"Persona Summary: {persona.learner_profile_summary}")
     print(f"Preliminary Roadmap: {persona.preliminary_personalized_roadmap_suggestions}")
-    save_persona(state.study_id, state.persona_summary) 
+    # save_persona(state.study_id, state.persona_summary) 
     # You might want to save persona to MongoDB here as well, if it's not handled by SaveAll node
     # persona_col.insert_one(persona.model_dump()) # Example if direct save needed
     return state
