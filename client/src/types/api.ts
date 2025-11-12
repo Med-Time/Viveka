@@ -31,7 +31,7 @@ export interface AnswerInterviewResponse {
   question?: string;
   concept?: string;
   message?: string;
-  feedback?: string[];
+  feedback?: string;
   final_score?: number;
   summary?: string;
 }

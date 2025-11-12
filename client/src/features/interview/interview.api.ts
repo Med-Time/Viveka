@@ -27,7 +27,7 @@ export type AnswerOkResponse = {
   question?: string;
   concept?: string;
   score?: number;
-  feedback?: any[]; // keep loose here — refine if you have a concrete shape
+  feedback?: any; // keep loose here — refine if you have a concrete shape
 };
 
 /**
@@ -37,7 +37,7 @@ export type AnswerDoneResponse = {
   status: "done";
   final_score?: number;
   summary?: string;
-  feedback?: any[];
+  feedback?: any;
 };
 
 /**

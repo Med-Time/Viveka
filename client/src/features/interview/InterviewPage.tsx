@@ -47,7 +47,7 @@ export const InterviewPage = () => {
   const [questionNumber, setQuestionNumber] = useState(1);
   const [score, setScore] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
-  const [feedback, setFeedback] = useState<string[] | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const storedUser = safeGetJson("user");
   const userId =
@@ -194,9 +194,8 @@ export const InterviewPage = () => {
 
                 {feedback && feedback.length > 0 ? (
                   <div className="text-sm text-muted-foreground space-y-2">
-                    {feedback.map((f, i) => (
-                      <p key={i}>{f}</p>
-                    ))}
+                    {feedback
+                    }
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">

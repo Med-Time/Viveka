@@ -40,7 +40,7 @@ def start_interview(data: InterviewStartInput):
         updated_state = result
     
     # Save session state
-    save_state(user_id, updated_state)
+    save_state(data.user_id, updated_state)
     
     # Check if curriculum exists and has content
     if not updated_state.get("curriculum") or len(updated_state["curriculum"]) == 0:
@@ -65,7 +65,7 @@ def start_interview(data: InterviewStartInput):
 @router.post("/answer")
 def answer_question(data: AnswerInput):
     # Load session state
-    state = load_state(user_id)
+    state = load_state(data.user_id)
     if not state:
         raise HTTPException(status_code=404, detail="Session not found.")
 
@@ -84,7 +84,7 @@ def answer_question(data: AnswerInput):
     else:
         updated_state = result
         
-    save_state(user_id, updated_state)
+    save_state(data.user_id, updated_state)
 
     # Save Q/A to MongoDB
     save_qa(
