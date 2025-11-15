@@ -24,6 +24,8 @@ export const PersonaPage = () => {
     enabled: !!studyId,
   });
 
+  
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">

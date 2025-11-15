@@ -5,8 +5,7 @@ import { QuestionShell } from "./QuestionShell";
 
 interface FillBlanksQuestionProps {
   id: string;
-  prompt: string;
-  blanks: number;
+  prompt: string;             // e.g. "The capital of France is ___ and currency is ___"
   questionNumber?: number;
   onSubmit: (answer: string[]) => void;
   disabled?: boolean;
@@ -15,46 +14,55 @@ interface FillBlanksQuestionProps {
 export const FillBlanksQuestion = ({
   id,
   prompt,
-  blanks,
   questionNumber,
   onSubmit,
   disabled,
 }: FillBlanksQuestionProps) => {
-  const [answers, setAnswers] = useState<string[]>(Array(blanks).fill(""));
+
+  // split prompt into text + blanks
+  // "The capital is ___ and currency is ___"
+  const parts = prompt.split(/___+/g);  // split by underscores
+  const blanks = parts.length - 1;      // number of blanks
+
+  const [answers, setAnswers] = useState<string[]>(
+    Array(blanks).fill("")
+  );
 
   const handleChange = (index: number, value: string) => {
-    const newAnswers = [...answers];
-    newAnswers[index] = value;
-    setAnswers(newAnswers);
+    const updated = [...answers];
+    updated[index] = value;
+    setAnswers(updated);
   };
 
   const handleSubmit = () => {
-    const allFilled = answers.every((a) => a.trim() !== "");
-    if (allFilled) {
-      onSubmit(answers);
-    }
+    const allFilled = answers.every((a) => a.trim());
+    if (allFilled) onSubmit(answers);
   };
 
-  const allFilled = answers.every((a) => a.trim() !== "");
+  const allFilled = answers.every((a) => a.trim());
 
   return (
     <QuestionShell type="fill_in_the_blanks" prompt={prompt} questionNumber={questionNumber}>
       <div className="space-y-4">
-        {Array.from({ length: blanks }).map((_, idx) => (
-          <div key={idx}>
-            <label htmlFor={`${id}-blank-${idx}`} className="mb-2 block text-sm font-medium">
-              Blank {idx + 1}
-            </label>
-            <Input
-              id={`${id}-blank-${idx}`}
-              value={answers[idx]}
-              onChange={(e) => handleChange(idx, e.target.value)}
-              placeholder={`Enter answer for blank ${idx + 1}`}
-              disabled={disabled}
-            />
-          </div>
-        ))}
+        <p className="leading-relaxed text-base">
+          {parts.map((text, idx) => (
+            <span key={idx}>
+              {text}
+              {idx < blanks && (
+                <Input
+                  id={`${id}-blank-${idx}`}
+                  className="inline-block mx-2 w-40"
+                  placeholder={`Blank ${idx + 1}`}
+                  value={answers[idx]}
+                  onChange={(e) => handleChange(idx, e.target.value)}
+                  disabled={disabled}
+                />
+              )}
+            </span>
+          ))}
+        </p>
       </div>
+
       <Button
         onClick={handleSubmit}
         disabled={!allFilled || disabled}

@@ -48,67 +48,76 @@ export const OnboardingPage = () => {
   });
 
   const onSubmit = async (data: OnboardingFormData) => {
-    try {
-      const storedUser = safeGetJson("user");
-      const userId =
-        storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
-      if (!userId) {
-        toast({
-          title: "Not logged in",
-          description: "Please login and try again.",
-          variant: "destructive",
-        });
-        return;
-      }
+  const storedUser = safeGetJson("user");
+  const userId =
+    storedUser?.id || storedUser?.user?.id || localStorage.getItem("id") || "";
+  if (!userId) {
+    toast({
+      title: "Not logged in",
+      description: "Please login and try again.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-      const payload: StartInterviewRequest = {
-        user_id: userId,
-        subject: data.course,
-        goal: data.specificGoals,
-        level: data.difficulty,
-        prior_knowledge: data.priorKnowledge,
-        hours_per_week: data.hoursPerWeek,
-      };
-
-      const res: StartInterviewResponse = await interviewApi.start(payload);
-
-      // persist current study id
-      localStorage.setItem("current_study_id", res.study_id);
-
-      const user = safeGetJson("user") || {};
-      const studies: Array<{ study_id?: string; subject?: string; created_at?: string }> =
-        Array.isArray(user.studies) ? user.studies : [];
-
-      const newEntry = {
-        study_id: res.study_id,
-        subject: payload.subject,           
-        created_at: new Date().toISOString()
-      };
-
-      const idx = studies.findIndex(s => s.study_id === res.study_id);
-      if (idx >= 0) {
-        // overwrite existing record for this study_id
-        studies[idx] = { ...studies[idx], ...newEntry };
-      } else {
-        studies.push(newEntry);
-      }
-      user.studies = studies;
-
-      safeSetJson("user", user);
-
-      toast({
-        title: "Preferences saved!",
-        description: "Let's begin your assessment.",
-      });
-      navigate("/interview", { state: { start: res } });
-    } catch (err) {
-      toast({
-        title: "Could not start assessment",
-        description: err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
-    }
+  const payload: StartInterviewRequest = {
+    user_id: userId,
+    subject: data.course,
+    goal: data.specificGoals,
+    level: data.difficulty,
+    prior_knowledge: data.priorKnowledge,
+    hours_per_week: data.hoursPerWeek,
   };
+
+  // Immediate UX: give the user feedback and navigate right away
+  toast({
+    title: "Starting assessment",
+    description: "Preparing your personalized assessment…",
+  });
+
+  try {
+    // Fire the API call (we await to persist the returned study info)
+    const res: StartInterviewResponse = await interviewApi.start(payload);
+
+    // persist study id and also store the full start response so InterviewPage can pick it up
+    localStorage.setItem("current_study_id", res.study_id);
+
+    // update user's studies in localStorage (merge or append)
+    const user = safeGetJson("user") || {};
+    const studies: Array<{ study_id?: string; subject?: string; created_at?: string }> =
+      Array.isArray(user.studies) ? user.studies : [];
+
+    const newEntry = {
+      study_id: res.study_id,
+      subject: payload.subject,
+      created_at: new Date().toISOString(),
+    };
+
+    const idx = studies.findIndex((s) => s.study_id === res.study_id);
+    if (idx >= 0) {
+      studies[idx] = { ...studies[idx], ...newEntry };
+    } else {
+      studies.push(newEntry);
+    }
+    user.studies = studies;
+    safeSetJson("user", user);
+    // Optional: show success toast when API finishes
+    toast({
+      title: "Assessment ready",
+      description: "Your assessment is ready — continue below.",
+    });
+    navigate("/interview",{ state: { start: res } });
+  } catch (err) {
+    // If start failed, show an error toast; InterviewPage should handle the missing start gracefully.
+    toast({
+      title: "Failed to start",
+      description: err instanceof Error ? err.message : "Please try again.",
+      variant: "destructive",
+    });
+    // You could optionally navigate back to onboarding here:
+    navigate("/onboarding");
+  }
+};
 
   return (
     <div className="min-h-screen bg-background">

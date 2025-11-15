@@ -82,6 +82,7 @@ export const LessonPlanPage = () => {
 
   const study_id = currentStudyId;
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // First: check whether a lesson plan already exists for this study.
   // If it exists, enable the react-query fetch (setHasGenerated(true)) so the main query runs.
@@ -108,21 +109,47 @@ export const LessonPlanPage = () => {
     enabled: hasGenerated && !!study_id,
   });
 
+  // --- generateMutation with onMutate + onSuccess + onError (updated per patch) ---
   const generateMutation = useMutation({
     mutationFn: () => lessonPlanApi.generate(study_id),
-    onSuccess: () => {
-      setHasGenerated(true);
+    // run before the mutation request is sent
+    onMutate: async () => {
+      setIsGenerating(true);      // show generating UI immediately
+      setHasGenerated(true);      // enable "generated" flow UI
+    },
+    onSuccess: async () => {
+      // generation finished on server — refresh the lesson plan
+      setIsGenerating(false);
       toast({
-        title: "Generating your lesson plan",
-        description: "This may take a moment...",
+        title: "Lesson plan generated",
+        description: "Fetching your personalized plan...",
       });
+      // refetch the plan; allow a small delay so backend can finish DB writes
       setTimeout(() => {
         refetch();
-      }, 2000);
+      }, 1000);
+    },
+    onError: (err: any) => {
+      setIsGenerating(false);
+      // mark as not generated so user can try again
+      setHasGenerated(false);
+      toast({
+        title: "Failed to generate lesson plan",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
+  // --- handle to start generation (call from UI) ---
   const handleGeneratePlan = () => {
+    if (!study_id) {
+      toast({ title: "Error", description: "Missing study id", variant: "destructive" });
+      return;
+    }
+    // mark as started immediately (onMutate does this too, but double-safety)
+    setIsGenerating(true);
+    setHasGenerated(true);
     generateMutation.mutate();
   };
 
@@ -156,65 +183,76 @@ export const LessonPlanPage = () => {
     navigate(`/content/${chapterIdx}/${targetSubtopicIdx}`);
   };
 
+  // --- UI: show generating screen while generation is happening or plan not yet available ---
+  // Replaces previous separate `if (!hasGenerated && !isLoading)` / `if (isGenerating || isLoading)` / `if (!lessonPlan)` blocks
+  if ((!hasGenerated && !isLoading) || isGenerating || (hasGenerated && !lessonPlan)) {
+    // Two main cases:
+    // 1) Not generated yet and not loading => show "generate" CTA
+    // 2) Generation started (isGenerating === true) OR hasGenerated true but lessonPlan not yet available => show "generating" UI
+    if (!hasGenerated && !isLoading && !isGenerating) {
+      // original "Generate your lesson plan" CTA
+      return (
+        <div className="min-h-screen bg-background">
+          <AppHeader />
+          <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
+            <Card className="max-w-md text-center">
+              <CardHeader>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <BookOpen className="h-8 w-8 text-primary" />
+                </div>
+                <CardTitle className="text-2xl">Generate Your Lesson Plan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-6 text-muted-foreground">
+                  Based on your learning profile and goals, we'll create a personalized curriculum just for you.
+                </p>
+                <Button
+                  size="lg"
+                  onClick={handleGeneratePlan}
+                  disabled={generateMutation.isPending || isGenerating}
+                  className="w-full"
+                >
+                  {generateMutation.isPending || isGenerating ? "Generating..." : "Generate Lesson Plan"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
 
-  if (!hasGenerated && !isLoading) {
+    // Generating placeholder while backend is working
     return (
       <div className="min-h-screen bg-background">
         <AppHeader />
         <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
-          <Card className="max-w-md text-center">
-            <CardHeader>
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <BookOpen className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle className="text-2xl">Generate Your Lesson Plan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-6 text-muted-foreground">
-                Based on your learning profile and goals, we'll create a personalized curriculum just for you.
+          <Card className="max-w-lg text-center p-8">
+            <div className="mb-4">
+              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <h3 className="text-lg font-semibold">Generating your lesson plan…</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                This can take a minute — we'll let you know when it's ready.
               </p>
-              <Button
-                size="lg"
-                onClick={handleGeneratePlan}
-                disabled={generateMutation.isPending}
-                className="w-full"
-              >
-                {generateMutation.isPending ? "Generating..." : "Generate Lesson Plan"}
+            </div>
+
+            <div className="flex gap-2justify-center mt-4">
+              <Button onClick={() => { /* optional: cancel flow if you support cancellation */ }} disabled>
+                Generating...
               </Button>
-            </CardContent>
+              <Button variant="outline" onClick={() => {
+                // allow user to go back to dashboard while generation continues in background
+                navigate("/");
+              }}>
+                Back to Dashboard
+              </Button>
+            </div>
           </Card>
         </div>
       </div>
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <AppHeader />
-        <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="text-muted-foreground">Creating your personalized lesson plan...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!lessonPlan) {
-    return (
-      <div className="min-h-screen bg-background">
-        <AppHeader />
-        <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center">
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground">No lesson plan available.</p>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
+  // --- rest of page follows: when lessonPlan exists you render it as before ---
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
