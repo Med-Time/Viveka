@@ -3,12 +3,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
 import { OpenQuestion } from "@/components/Question/OpenQuestion";
+import { FillBlanksQuestion } from "@/components/Question/FillBlanksQuestion";
+import { McqQuestion } from "@/components/Question/McqQuestion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle } from "lucide-react";
 import { interviewApi } from "./interview.api";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import {
   StartInterviewResponse,
   AnswerInterviewResponse,
@@ -79,6 +82,7 @@ export const InterviewPage = () => {
 
           // Save study_id if backend returned one and navigate to persona page
           if (data.study_id) localStorage.setItem("current_study_id", data.study_id);
+          
           navigate("/persona");
           return;
         }
@@ -194,8 +198,7 @@ export const InterviewPage = () => {
 
                 {feedback && feedback.length > 0 ? (
                   <div className="text-sm text-muted-foreground space-y-2">
-                    {feedback
-                    }
+                    <MarkdownRenderer content={feedback || "No feedback for this Question."} />
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -224,19 +227,42 @@ export const InterviewPage = () => {
           </Card>
         )}
 
-        {/* Question */}
-        {!showResult && (
-          <>
-            <OpenQuestion
-              id={`${studyId}-${questionNumber}`}
-              prompt={prompt}
-              questionNumber={questionNumber}
-              onSubmit={handleSubmitAnswer}
-              disabled={answerMutation.isPending}
-              hint={concept}
-            />
-          </>
+    {/* Question */}
+    {!showResult && (
+      <>
+      {qType === "mcq" && Array.isArray((current as any).options) ? (
+              <McqQuestion
+                id={`${studyId}-${questionNumber}`}
+                prompt={prompt}
+                options={(current as any).options}
+                questionNumber={questionNumber}
+                onSubmit={handleSubmitAnswer}
+                disabled={answerMutation.isPending}
+              />
+            ) : qType === "fill_in_the_blanks" ? (
+          <FillBlanksQuestion
+            id={`${studyId}-${questionNumber}`}
+            prompt={prompt}
+            // prefer explicit blanks count from backend; fallback to 1 if missing or invalid
+            blanks={typeof (current as any).blanks === "number" && (current as any).blanks > 0 ? (current as any).blanks : 1}
+            questionNumber={questionNumber}
+            onSubmit={(answers: string[]) => handleSubmitAnswer(answers)}
+            disabled={answerMutation.isPending}
+          />
+        ) : (
+          // For MCQ / detailed / one word / etc. we render the OpenQuestion (text area)
+          <OpenQuestion
+            id={`${studyId}-${questionNumber}`}
+            prompt={prompt}
+            questionNumber={questionNumber}
+            onSubmit={handleSubmitAnswer}
+            disabled={answerMutation.isPending}
+            hint={concept}
+          />
         )}
+      </>
+    )}
+
       </div>
     </div>
   );

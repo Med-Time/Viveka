@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut } from "lucide-react";
 import { contentApi } from "./content.api";
+import { progressApi, ProgressCompleteRequest } from "../content/progress.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { safeGetJson, safeSetJson } from "@/utils/storage";
@@ -19,6 +20,7 @@ export const ContentPage = () => {
   const chapterIdx = parseInt(params.chapter_idx || "0", 10);
   const subtopicIdx = parseInt(params.subtopic_idx || "0", 10); // default 0
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Prefer explicit selected study id in localStorage, fallback to user object
   const auth = safeGetJson("user") || {};
@@ -182,21 +184,6 @@ export const ContentPage = () => {
   // Navigation (subtopic within chapter; if boundary, navigate to prev/next chapter)
   const goToSubtopic = (idx: number) => {
     // update last_read before navigation
-    try {
-      const payload = {
-        study_id: currentStudyId,
-        chapterIdx,
-        subtopicIdx: idx,
-        chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
-        subtopicTitle:
-          normalizedSubtopics[idx]?.title ||
-          Object.keys((content as any)?.generated_content || {})[idx] ||
-          `Subtopic ${idx + 1}`,
-      };
-      localStorage.setItem("last_read", JSON.stringify(payload));
-    } catch {
-      // ignore storage errors
-    }
     navigate(`/content/${chapterIdx}/${idx}`);
     // reset state so page re-checks existence
     setHasGenerated(null);
@@ -207,14 +194,111 @@ export const ContentPage = () => {
       goToSubtopic(currentIdx - 1);
     } else if (chapterIdx > 0) {
       // go to previous chapter last subtopic
-      // we navigate to previous chapter; UI will re-check and default to subtopic 0 — adjust if you want last
       navigate(`/content/${chapterIdx - 1}/0`);
       setHasGenerated(null);
     }
   };
 
-  const handleNext = () => {
+  // PROGRESS MUTATION: writes completion to backend
+  const progressMutation = useMutation({
+    mutationFn: (payload: ProgressCompleteRequest) => progressApi.complete(payload),
+    onSuccess: (_data, variables) => {
+      // After saving to backend, invalidate relevant queries so lesson-plan / content reflect new state
+      // try {
+      //   // Invalidate content for this study/chapter
+      //   queryClient.invalidateQueries(queryKeys.content.get(variables.study_id, variables.chapterIdx));
+      // } catch {}
+      // try {
+      //   // Try to invalidate lesson-plan queries (if you have such a key)
+      //   queryClient.invalidateQueries(queryKeys.lessonPlan?.(variables.study_id) || ["lesson-plan", variables.study_id]);
+      // } catch {}
+    },
+  });
+
+  // handleComplete now saves to backend, updates local last_read, and invalidates queries
+  const handleComplete = async () => {
+    const studyID = currentStudyId;
+    if (!studyID) {
+      toast({
+        title: "Error",
+        description: "Missing study ID — please select a study first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newEntry = {
+      study_id: studyID,
+      chapterIdx,
+      subtopicIdx: currentIdx,
+      chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
+      subtopicTitle: currentTitle,
+    };
+
+    // 1) Persist to backend
+    const progressPayload: ProgressCompleteRequest = {
+      user_id: auth?.id || "",
+      study_id: newEntry.study_id,
+      chapter_idx: newEntry.chapterIdx,
+      subtopic_idx: newEntry.subtopicIdx,
+      chapter_title: newEntry.chapterTitle,
+      subtopic_title: newEntry.subtopicTitle,
+    };
+
+    try {
+      // Use mutateAsync to await success/failure
+      await progressMutation.mutateAsync(progressPayload);
+    } catch (err) {
+      toast({
+        title: "Failed to save progress",
+        description: err instanceof Error ? err.message : "Could not save progress to server.",
+        variant: "destructive",
+      });
+      // Still continue to update local storage — up to you; I'll still save locally
+    }
+
+    // 2) Update local last_read (array-per-study format)
+    const existingData = safeGetJson("last_read");
+
+    let updatedData: any[] = [];
+
+    if (Array.isArray(existingData)) {
+      // Check if this study already exists
+      const index = existingData.findIndex((item) => item.study_id === studyID);
+      if (index !== -1) {
+        // Overwrite the existing record
+        existingData[index] = newEntry;
+        updatedData = existingData;
+      } else {
+        // Append new study progress
+        updatedData = [...existingData, newEntry];
+      }
+    } else if (existingData && typeof existingData === "object" && existingData.study_id) {
+      // Old format (single object) — migrate to array
+      if (existingData.study_id === studyID) {
+        updatedData = [newEntry];
+      } else {
+        updatedData = [existingData, newEntry];
+      }
+    } else {
+      // No existing data — create new entry
+      updatedData = [newEntry];
+    }
+
+    safeSetJson("last_read", updatedData);
+    progressMutation.mutate(progressPayload);
+
+    // 3) Invalidate lesson-plan & content queries (already attempted in onSuccess, but re-run here to be safe)
+
+    toast({
+      title: "Progress saved!",
+      description: `Marked complete: ${newEntry.subtopicTitle}`,
+    });
+  };
+
+  const handleNext = async () => {
     if (currentIdx + 1 < totalSubtopics) {
+      // Wait for complete to finish, then navigate to next subtopic
       goToSubtopic(currentIdx + 1);
     } else {
       // move to next chapter first subtopic
@@ -222,63 +306,6 @@ export const ContentPage = () => {
       setHasGenerated(null);
     }
   };
-
-  // also persist when user marks complete or navigates next/previous
-const handleComplete = () => {
-  const studyID = currentStudyId;
-  if (!studyID) {
-    toast({
-      title: "Error",
-      description: "Missing study ID — please select a study first.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  const newEntry = {
-    study_id: studyID,
-    chapterIdx,
-    subtopicIdx: currentIdx,
-    chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
-    subtopicTitle: currentTitle,
-  };
-
-  // Safely read current last_read data
-  const existingData = safeGetJson("last_read");
-
-  let updatedData: any[] = [];
-
-  if (Array.isArray(existingData)) {
-    // Check if this study already exists
-    const index = existingData.findIndex((item) => item.study_id === studyID);
-    if (index !== -1) {
-      // Overwrite the existing record
-      existingData[index] = newEntry;
-      updatedData = existingData;
-    } else {
-      // Append new study progress
-      updatedData = [...existingData, newEntry];
-    }
-  } else if (existingData && typeof existingData === "object" && existingData.study_id) {
-    // Old format (single object) — migrate to array
-    if (existingData.study_id === studyID) {
-      updatedData = [newEntry];
-    } else {
-      updatedData = [existingData, newEntry];
-    }
-  } else {
-    // No existing data — create new entry
-    updatedData = [newEntry];
-  }
-
-  // Persist safely
-  safeSetJson("last_read", updatedData);
-
-  toast({
-    title: "Progress saved!",
-    description: `Marked complete: ${newEntry.subtopicTitle}`,
-  });
-};
 
   const [assistantOpen, setAssistantOpen] = useState(false);
 
@@ -378,12 +405,12 @@ const handleComplete = () => {
             Previous
           </Button>
 
-          <Button variant="secondary" onClick={handleComplete}>
+          <Button variant="secondary" onClick={() => void handleComplete()}>
             <Check className="mr-2 h-4 w-4" />
             Mark Complete
           </Button>
 
-          <Button onClick={handleNext}>
+          <Button onClick={() => void handleNext()}>
             Next
             <ChevronRight className="ml-2 h-4 w-4" />
           </Button>

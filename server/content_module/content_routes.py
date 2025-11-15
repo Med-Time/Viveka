@@ -1,11 +1,11 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from bson import ObjectId
-from content_module.core.mongo import sessions_col
+from content_module.core.mongo import sessions_col, lesson_plans
 from content_module.core.mongo_fetch import fetch_generated_content
 from content_module.core.mongo_persistence import save_generated_content
 from content_module.langgraph_flow.content_graph import graph
-from content_module.schemas import ContentInput, ContentResponse
+from content_module.schemas import ContentInput, ContentResponse, ProgressInput
 
 router = APIRouter(
     prefix="/content",
@@ -126,3 +126,60 @@ async def get_generated_content_by_subtopic(study_id: str, chapter_idx: int, ind
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving content: {str(e)}")
+
+# @router.post("/progress/complete_subtopic")
+# async def complete_subtopic_progress(payload: ProgressInput):
+#     """
+#     Mark a subtopic as completed for a user in a study session.
+#     """
+#     study_data = sessions_col.find_one({"_id": ObjectId(payload.study_id)})
+#     if not study_data:
+#         raise HTTPException(status_code=404, detail="study not found")
+#     try:
+#         lesson_plans.update_one(
+#             {"study_id": payload.study_id},
+#             {
+#                 "$set": {
+#                     "lesson_plan.chapters.$[chap].sub_topics.$[sub].completed": True,
+#                     "lesson_plan.chapters.$[chap].sub_topics.$[sub].completed_at": datetime.utcnow(),
+#                 }
+#             },
+#             array_filters=[
+#                 {"chap.chapter_idx": payload.chapter_idx},
+#                 {"sub.subtopic_idx": payload.subtopic_idx},
+#             ],
+#             upsert=False,
+#         )
+#     except Exception as e:
+#         print("Could not update lesson plan", str(e))
+#     return {"status": "ok", "study_id": payload.study_id, "chapter_idx": payload.chapter_idx, "subtopic_idx": payload.subtopic_idx, "message": "Subtopic marked as completed."}
+
+@router.post("/progress/complete_subtopic")
+def mark_subtopic_complete(data: ProgressInput):
+    study_id = data.study_id
+    c_idx = data.chapter_idx
+    s_idx = data.subtopic_idx
+
+    # Build filter to find the document containing the study
+    # Adjust collection / field names to your schema
+    filter_doc = {"study_id": study_id}
+
+    # Use arrayFilters to update the exact chapter/subtopic by index
+    update = {
+        "$set": {
+            f"lesson_plan.chapters.{c_idx}.sub_topics.{s_idx}.completed": True,
+            f"lesson_plan.chapters.{c_idx}.sub_topics.{s_idx}.completed_at": datetime.utcnow()
+        }
+    }
+
+    # Try to update the document
+    result = lesson_plans.update_one(filter_doc, update)
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lesson plan not found for study_id")
+
+    if result.modified_count == 0:
+        # Possibly the fields were already set, still return ok
+        return {"status": "ok", "message": "No change (already completed)"}
+
+    return {"status": "ok", "study_id": data.study_id, "chapter_idx": data.chapter_idx, "subtopic_idx": data.subtopic_idx, "message": "Subtopic marked as completed."}

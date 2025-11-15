@@ -10,6 +10,8 @@ class SubtopicContent(BaseModel):
     index: int = Field(..., description="0-based index within the chapter.")
     title: str = Field(..., description="Subtopic title.")
     content: str = Field(..., description="Generated content for the subtopic.")
+    completed: Optional[bool] = Field(None, description="Completion status of the subtopic.")
+    completed_at: Optional[str] = Field(None, description="Timestamp when the subtopic was completed.")
 
 
 class ContentResponse(BaseModel):
@@ -79,3 +81,11 @@ class ContentEvaluation(BaseModel):
     grade: Literal["Good", "Bad"] = Field(..., description="Overall content quality grade.")
     feedback: str = Field(..., description="Summary feedback across all subtopics.")
     metrics: Dict[str, SubtopicEvaluation] = Field(..., description="Per-subtopic structured evaluations.")
+
+class ProgressInput(BaseModel):
+    user_id: str
+    study_id: str
+    chapter_idx: int
+    subtopic_idx: int
+    chapter_title: Optional[str] = None
+    subtopic_title: Optional[str] = None

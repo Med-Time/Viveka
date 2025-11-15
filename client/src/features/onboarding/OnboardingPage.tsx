@@ -72,16 +72,39 @@ export const OnboardingPage = () => {
 
       const res: StartInterviewResponse = await interviewApi.start(payload);
 
+      // persist current study id
       localStorage.setItem("current_study_id", res.study_id);
+
+      const user = safeGetJson("user") || {};
+      const studies: Array<{ study_id?: string; subject?: string; created_at?: string }> =
+        Array.isArray(user.studies) ? user.studies : [];
+
+      const newEntry = {
+        study_id: res.study_id,
+        subject: payload.subject,           
+        created_at: new Date().toISOString()
+      };
+
+      const idx = studies.findIndex(s => s.study_id === res.study_id);
+      if (idx >= 0) {
+        // overwrite existing record for this study_id
+        studies[idx] = { ...studies[idx], ...newEntry };
+      } else {
+        studies.push(newEntry);
+      }
+      user.studies = studies;
+
+      safeSetJson("user", user);
+
       toast({
         title: "Preferences saved!",
         description: "Let's begin your assessment.",
       });
-      navigate("/interview", {state: {start: res}});
+      navigate("/interview", { state: { start: res } });
     } catch (err) {
       toast({
-        title: "Error",
-        description: "Failed to start interview. Try again.",
+        title: "Could not start assessment",
+        description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       });
     }

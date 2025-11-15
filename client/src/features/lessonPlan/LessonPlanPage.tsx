@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LessonPlanList } from "@/components/Plan/LessonPlanList";
 import { BookOpen } from "lucide-react";
 import { lessonPlanApi } from "./lessonPlan.api";
+
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { safeGetJson } from "@/utils/storage";
@@ -79,18 +80,18 @@ export const LessonPlanPage = () => {
     );
   }
 
-  const sessionId = currentStudyId;
+  const study_id = currentStudyId;
   const [hasGenerated, setHasGenerated] = useState(false);
 
   // First: check whether a lesson plan already exists for this study.
   // If it exists, enable the react-query fetch (setHasGenerated(true)) so the main query runs.
   useEffect(() => {
-    if (!sessionId) return;
+    if (!study_id) return;
     let mounted = true;
     (async () => {
       try {
         // Try to fetch the lesson plan; if it exists, enable main query
-        await lessonPlanApi.get(sessionId);
+        await lessonPlanApi.get(study_id);
         if (mounted) setHasGenerated(true);
       } catch (err) {
         // If not found or error, we keep hasGenerated=false so UI shows generate button
@@ -99,16 +100,16 @@ export const LessonPlanPage = () => {
     return () => {
       mounted = false;
     };
-  }, [sessionId]);
+  }, [study_id]);
 
   const { data: lessonPlan, isLoading, refetch } = useQuery({
-    queryKey: queryKeys.lessonPlan.get(sessionId),
-    queryFn: () => lessonPlanApi.get(sessionId),
-    enabled: hasGenerated && !!sessionId,
+    queryKey: queryKeys.lessonPlan.get(study_id),
+    queryFn: () => lessonPlanApi.get(study_id),
+    enabled: hasGenerated && !!study_id,
   });
 
   const generateMutation = useMutation({
-    mutationFn: () => lessonPlanApi.generate(sessionId),
+    mutationFn: () => lessonPlanApi.generate(study_id),
     onSuccess: () => {
       setHasGenerated(true);
       toast({
@@ -126,8 +127,35 @@ export const LessonPlanPage = () => {
   };
 
   const handleStartChapter = (chapterIdx: number) => {
-    navigate(`/content/${chapterIdx}`);
+    if (!lessonPlan) {
+      // fallback: go to chapter root
+      navigate(`/content/${chapterIdx}/0`);
+      return;
+    }
+
+    const chapters = lessonPlan.lesson_plan?.chapters || [];
+    const chapter = chapters[chapterIdx];
+
+    if (!chapter || !Array.isArray(chapter.sub_topics) || chapter.sub_topics.length === 0) {
+      // no subtopics — go to chapter 0
+      navigate(`/content/${chapterIdx}/0`);
+      return;
+    }
+
+    // Find index of first subtopic that is NOT completed
+    const firstUncompleted = chapter.sub_topics.findIndex((st: any) => !Boolean(st.completed));
+
+    // If none uncompleted, go to last subtopic; otherwise go to first uncompleted
+    const targetSubtopicIdx = firstUncompleted === -1 ? chapter.sub_topics.length - 1 : firstUncompleted;
+
+    // Persist current study id if not already
+    if (!localStorage.getItem("current_study_id") && currentStudyId) {
+      localStorage.setItem("current_study_id", currentStudyId);
+    }
+
+    navigate(`/content/${chapterIdx}/${targetSubtopicIdx}`);
   };
+
 
   if (!hasGenerated && !isLoading) {
     return (
@@ -194,7 +222,7 @@ export const LessonPlanPage = () => {
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
           <p className="text-muted-foreground">
-            Your personalized learning path with {lessonPlan.lesson_plan.chapters.length} chapters
+            {lessonPlan.lesson_plan.overall_course_outcome}
           </p>
         </div>
 

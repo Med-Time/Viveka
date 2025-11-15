@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Brain, Target, Play } from "lucide-react";
+import { BookOpen, Target, Play } from "lucide-react";
 import { safeGetJson } from "@/utils/storage";
 // ⬇️ shadcn select
 import {
@@ -18,17 +18,41 @@ export const DashboardPage = () => {
   const navigate = useNavigate();
   const storedUser = safeGetJson("user") || {};
   const persistedStudyId = localStorage.getItem("current_study_id");
+
   const userStudies: { study_id?: string; subject?: string; created_at?: string }[] =
     storedUser?.studies || [];
+
+  // Helper: get most recent study_id from last_read array (last element considered most recent)
+  const getMostRecentLastReadStudyId = (): string | null => {
+    const allLastReads = safeGetJson("last_read");
+    if (Array.isArray(allLastReads) && allLastReads.length > 0) {
+      const last = allLastReads[allLastReads.length - 1];
+      return last?.study_id || null;
+    }
+    // If old single-object format
+    if (allLastReads && typeof allLastReads === "object" && allLastReads.study_id) {
+      return allLastReads.study_id;
+    }
+    return null;
+  };
 
   // validate persisted study id against user's studies
   const validPersisted =
     persistedStudyId && userStudies.some((s) => s.study_id === persistedStudyId)
       ? persistedStudyId
       : null;
-  const defaultStudyId = userStudies?.[0]?.study_id || storedUser?.current_study_id || "";
 
-  const [currentStudyId, setCurrentStudyId] = useState<string>(validPersisted || defaultStudyId);
+  // Determine default study id priority:
+  // 1) valid persisted, 2) first userStudies entry, 3) most recent last_read study, 4) storedUser.current_study_id, 5) ""
+  const mostRecentFromLastRead = getMostRecentLastReadStudyId();
+  const defaultStudyId =
+    validPersisted ||
+    (userStudies?.[0]?.study_id || null) ||
+    mostRecentFromLastRead ||
+    storedUser?.current_study_id ||
+    "";
+
+  const [currentStudyId, setCurrentStudyId] = useState<string>(defaultStudyId);
   const [showStudySelector, setShowStudySelector] = useState<boolean>(false);
 
   // show selector when user has multiple studies and none selected
@@ -40,18 +64,11 @@ export const DashboardPage = () => {
     }
   }, [currentStudyId, userStudies]);
 
-  // read last-read location if present
-  let lastRead: any = null;
-  try {
-    lastRead = JSON.parse(localStorage.getItem("last_read") || "null");
-  } catch {
-    lastRead = null;
-  }
-
+  // read last-read location if present and find matching entry for currentStudyId
   const allLastReads = safeGetJson("last_read") || [];
   const currentLastRead =
     Array.isArray(allLastReads)
-      ? allLastReads.find((item) => item.study_id === currentStudyId)
+      ? allLastReads.find((item) => item.study_id === currentStudyId) || null
       : allLastReads && allLastReads.study_id === currentStudyId
       ? allLastReads
       : null;
@@ -65,7 +82,7 @@ export const DashboardPage = () => {
     setShowStudySelector(false);
   };
 
-  const hasMultipleSubjects = userStudies.length > 1;
+  const hasMultipleSubjects = (userStudies || []).length > 1;
 
   return (
     <div className="min-h-screen bg-background">
@@ -198,7 +215,7 @@ export const DashboardPage = () => {
           )}
 
           {/* Continue Reading card */}
-          {canContinue && (
+          {canContinue && currentLastRead && (
             <Card className="transition-shadow hover:shadow-md col-span-full md:col-span-1">
               <CardHeader>
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">
@@ -209,13 +226,12 @@ export const DashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="mb-2 text-sm text-muted-foreground">
-                  {lastRead?.chapterTitle ? lastRead.chapterTitle : `Chapter ${lastRead?.chapterIdx}`}
-                  {lastRead?.subtopicTitle
-                    ? ` — ${lastRead.subtopicTitle}`
-                    : ` — Subtopic ${((lastRead?.subtopicIdx ?? 0) + 1)}`}
+                  {currentLastRead.chapterTitle
+                    ? `${currentLastRead.chapterTitle} — ${currentLastRead.subtopicTitle || ""}`
+                    : `Chapter ${currentLastRead.chapterIdx ?? 0} — Subtopic ${((currentLastRead.subtopicIdx ?? 0) + 1)}`}
                 </div>
                 <Button
-                  onClick={() => navigate(`/content/${lastRead.chapterIdx}/${lastRead.subtopicIdx}`)}
+                  onClick={() => navigate(`/content/${currentLastRead.chapterIdx}/${currentLastRead.subtopicIdx}`)}
                   variant="outline"
                   className="w-full gap-2"
                 >

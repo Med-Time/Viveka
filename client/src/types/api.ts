@@ -85,6 +85,8 @@ export interface SubTopic {
   sub_topic_title: string;
   sub_topic_outcome?: string;
   estimated_time_minutes?: number;
+  completed?: boolean;
+  completed_at?: string | Date;
 };
 
 export interface Chapter {
