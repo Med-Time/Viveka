@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { QuestionShell } from "./QuestionShell";
+import { SpeechTextarea } from "./SpeechTextarea"; // <- new
 
 interface OpenQuestionProps {
   id: string;
@@ -9,7 +9,7 @@ interface OpenQuestionProps {
   questionNumber?: number;
   onSubmit: (answer: string) => void;
   disabled?: boolean;
-  hint?: string;
+  hint?: string | null;
 }
 
 export const OpenQuestion = ({
@@ -21,33 +21,23 @@ export const OpenQuestion = ({
   hint,
 }: OpenQuestionProps) => {
   const [answer, setAnswer] = useState("");
-  const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
+
+  const wordCount = answer.trim().split(/\s+/).filter(Boolean).length;
 
   const handleSubmit = () => {
     if (answer.trim()) {
-      onSubmit(answer);
+      onSubmit(answer.trim());
     }
   };
 
   return (
-    <QuestionShell type="detailed_answer" prompt={prompt} questionNumber={questionNumber}>
+    <QuestionShell type="detailed_answer" prompt={prompt} questionNumber={questionNumber} hint={hint}>
       <div className="space-y-4">
-        {/* Render hint if provided */}
-        {hint && (
-          <div className="rounded-md border border-border bg-muted/5 p-3 text-sm text-muted-foreground">
-            <strong className="mr-1">Hint:</strong>
-            <span>{hint}</span>
-          </div>
-        )}
-
-        <Textarea
-          id={id}
+        <SpeechTextarea
           value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Type your answer here..."
+          onChange={setAnswer}
+          placeholder="Type your answer here or use the mic..."
           disabled={disabled}
-          rows={6}
-          className="resize-none"
         />
 
         <div className="flex items-center justify-between">
@@ -55,11 +45,7 @@ export const OpenQuestion = ({
         </div>
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        disabled={!answer.trim() || disabled}
-        className="mt-4 w-full"
-      >
+      <Button onClick={handleSubmit} disabled={!answer.trim() || disabled} className="mt-4 w-full">
         Submit Answer
       </Button>
     </QuestionShell>

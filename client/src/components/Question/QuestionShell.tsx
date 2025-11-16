@@ -7,9 +7,10 @@ interface QuestionShellProps {
   prompt: string;
   questionNumber?: number;
   children: React.ReactNode;
+  hint?: string | null;
 }
 
-export const QuestionShell = ({ type, prompt, questionNumber, children }: QuestionShellProps) => {
+export const QuestionShell = ({ type, prompt, questionNumber, children, hint }: QuestionShellProps) => {
   const typeLabels: Record<QuestionType, string> = {
     mcq: "Multiple Choice",
     detailed_answer: "Open Ended",
@@ -27,6 +28,11 @@ export const QuestionShell = ({ type, prompt, questionNumber, children }: Questi
         )}
         <Badge variant="secondary">{typeLabels[type]}</Badge>
       </div>
+      {hint && (
+        <div className="mb-3 rounded border bg-muted/30 p-2 text-sm text-muted-foreground">
+          Hint: {hint}
+        </div>
+      )}
       <h3 className="mb-6 text-lg font-semibold">{prompt}</h3>
       {children}
     </Card>
