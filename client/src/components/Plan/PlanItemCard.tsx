@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, BookOpen, ChevronDown } from "lucide-react";
 import { Chapter } from "@/types/api";
@@ -10,14 +10,10 @@ interface PlanItemCardProps {
   item: Chapter;
   index: number;
   onStart: () => void;
+  onStartSubtopic: (chapterIdx: number, subtopicIdx: number) => void;
 }
 
-/**
- * PlanItemCard
- * - Click a subtopic row to toggle showing its outcome (with a small fade/slide).
- * - If a subtopic is completed and has completed_at, hovering its badge shows a styled tooltip.
- */
-export const PlanItemCard = ({ item, index, onStart }: PlanItemCardProps) => {
+export const PlanItemCard = ({ item, index, onStart, onStartSubtopic }: PlanItemCardProps) => {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   const toggle = (i: number) => {
@@ -50,23 +46,13 @@ export const PlanItemCard = ({ item, index, onStart }: PlanItemCardProps) => {
             const isOpen = openIdx === idx;
             const completed = Boolean((subTopic as any).completed);
             const completedAt = (subTopic as any).completed_at;
-            const formattedDate =
-              completedAt ? format(new Date(completedAt), "PPP p") : "";
+            const formattedDate = completedAt ? format(new Date(completedAt), "PPP p") : "";
 
             return (
               <li key={idx} className="flex flex-col gap-2">
                 <div
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={isOpen}
+                  className="group flex items-center justify-between gap-3 rounded-lg border border-border p-3 hover:bg-muted cursor-pointer"
                   onClick={() => toggle(idx)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      toggle(idx);
-                    }
-                  }}
-                  className="group flex items-center justify-between gap-3 rounded-lg border border-border p-3 hover:bg-muted cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <div className="flex items-start gap-3">
                     <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
@@ -82,52 +68,57 @@ export const PlanItemCard = ({ item, index, onStart }: PlanItemCardProps) => {
 
                   <div className="flex items-center gap-3">
                     {completed && (
-                      // wrapper is relative so tooltip can be positioned absolutely
                       <div className="relative inline-flex">
                         <Badge className="cursor-default" variant="secondary">
                           Completed
                         </Badge>
 
-                        {/* Tooltip: appears on group-hover / hover of badge (for mouse) and on focus (keyboard) */}
                         <div
                           role="tooltip"
-                          className={`pointer-events-none absolute right-0 top-full z-20 mt-2 w-max max-w-xs transform rounded-md border bg-popover p-2 text-xs shadow-lg opacity-0 transition-all duration-200 
-                            group-hover:opacity-100 group-focus-within:opacity-100
-                            ${formattedDate ? "translate-y-0" : "hidden"}`}
+                          className={`pointer-events-none absolute right-0 top-full z-20 mt-2 
+                            rounded-md border bg-popover p-2 text-xs shadow-lg opacity-0 
+                            transition-all duration-200 group-hover:opacity-100`}
                           style={{ whiteSpace: "nowrap" }}
                         >
-                          <div className="px-2 py-1">
-                            <div className="text-xs text-muted-foreground">Completed at</div>
-                            <div className="font-medium">{formattedDate || "-"}</div>
-                          </div>
-                          {/* small arrow */}
+                          <div className="text-xs text-muted-foreground">Completed at</div>
+                          <div className="font-medium">{formattedDate}</div>
                           <div className="absolute right-2 -top-1 h-2 w-2 rotate-45 bg-popover border-t border-l" />
                         </div>
                       </div>
                     )}
 
+                    {/* Chevron */}
                     <ChevronDown
                       className={`h-4 w-4 transition-transform duration-200 ${
-                        isOpen ? "rotate-180" : "rotate-0"
+                        isOpen ? "rotate-180" : ""
                       } text-muted-foreground`}
                     />
                   </div>
                 </div>
 
-                {/* Expandable outcome panel */}
+                {/* Expandable Outcome Section */}
                 <div
                   className={`overflow-hidden transition-all duration-200 ${
                     isOpen ? "max-h-96 opacity-100 py-2" : "max-h-0 opacity-0"
                   }`}
                 >
-                  {/* content area with small fade + slide effect */}
                   <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-                    {/* Only render the paragraph when open to avoid layout jumps */}
                     {isOpen && (
                       <div className="prose max-w-none">
-                        {subTopic.sub_topic_outcome || "No outcome provided for this subtopic."}
+                        {subTopic.sub_topic_outcome || "No outcome provided."}
                       </div>
                     )}
+
+                    <Button
+                      size="sm"
+                      className={buttonVariants({ variant: "ghost" }) + " mt-3"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStartSubtopic(index, idx);
+                      }}
+                    >
+                      Go to this Subtopic
+                    </Button>
                   </div>
                 </div>
               </li>

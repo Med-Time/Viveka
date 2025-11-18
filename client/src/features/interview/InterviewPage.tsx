@@ -19,6 +19,7 @@ import {
 } from "@/types/api";
 import { safeGetJson } from "@/utils/storage";
 import { toast } from "@/hooks/use-toast";
+import { extractOptions } from "@/lib/utils";
 
 type LocationState = {
   start: StartInterviewResponse;
@@ -153,6 +154,13 @@ export const InterviewPage = () => {
   const prompt = current.question; // string per backend
   const concept = current.concept; // optional hint
   const studyId = current.study_id;
+  let options: string[] = [];
+
+  if (qType === "mcq") {
+    options = Array.isArray((current as any).options)
+      ? current.options
+      : extractOptions(prompt);
+  }
 
   // Utility to render score as percentage regardless of backend format
   const formatScorePercent = (s: number | null) => {
@@ -234,7 +242,7 @@ export const InterviewPage = () => {
               <McqQuestion
                 id={`${studyId}-${questionNumber}`}
                 prompt={prompt}
-                options={(current as any).options}
+                options={options}
                 questionNumber={questionNumber}
                 onSubmit={handleSubmitAnswer}
                 disabled={answerMutation.isPending}
@@ -250,7 +258,7 @@ export const InterviewPage = () => {
             disabled={answerMutation.isPending}
           />
         ) : (
-          // For MCQ / detailed / one word / etc. we render the OpenQuestion (text area)
+          //detailed / one word / etc. we render the OpenQuestion (text area)
           <OpenQuestion
             id={`${studyId}-${questionNumber}`}
             prompt={prompt}

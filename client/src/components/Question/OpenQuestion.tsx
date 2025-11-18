@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuestionShell } from "./QuestionShell";
-import { SpeechTextarea } from "./SpeechTextarea"; // <- new
+import { SpeechTextarea } from "./SpeechTextarea";
 
 interface OpenQuestionProps {
   id: string;
