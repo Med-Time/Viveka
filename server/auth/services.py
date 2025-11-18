@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 from auth.schemas import SignupRequest
-from typing import Optional
+from typing import Any, Optional, Dict
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
