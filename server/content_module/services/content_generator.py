@@ -70,6 +70,7 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
         --- Lesson Plan Context ---
         Subject: {lesson_plan['lesson_plan']['subject_name']}
         Chapter: {chapter_title}
+        Chapter Objective: {lesson_plan['lesson_plan']['chapters'][0]['chapter_objective']}
 
         --- Subtopic to Cover ---
         Title: {subtopic['sub_topic_title']}
@@ -86,18 +87,18 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
         2. **Structure**
         - Start with a **clear introduction** to the subtopic (what it is and why it matters).
         - Provide a **step-by-step explanation** of the concepts.
-        - Include **worked-out examples** or scenarios relevant to exams.
+        - Include **worked-out examples**.
         - Add **important formulas, key terms, or definitions** in a highlighted manner.
         - Provide **common concept clearance questions and answers** (MCQs, short answer, problem-solving).
         - End with a **summary or quick revision notes** for last-minute revision.
 
         3. **Depth**
-        - Ensure the explanation is detailed enough to prepare for exams, not just surface-level.
+        - Ensure the explanation is detailed enough to get concept, not just surface-level.
         - Highlight connections to other related topics if relevant.
         - Include tips or mnemonics for remembering key points.
 
         4. **Output Format**
-        - Use clear sections with markdown headings (### Introduction, ### Explanation, ### Examples, ### Exam Practice, ### Summary).
+        - Use clear sections with markdown headings for example: (### Introduction, ### Explanation, ### Examples, ### Practice Questions, ### Summary).
         - Use bullet points, numbered lists, and tables where appropriate.
         - Keep it easy to read and revision-friendly.
 
@@ -107,7 +108,7 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
         --- Task ---
         Now, generate the full content for this subtopic based on the above instructions.
         """
-    print(f"Prompt for content generation: {prompt}")
+    # print(f"Prompt for content generation: {prompt}")
     return agent.invoke(prompt).content
 
 

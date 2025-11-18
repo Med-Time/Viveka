@@ -6,6 +6,7 @@ import { QuestionShell } from "./QuestionShell";
 interface FillBlanksQuestionProps {
   id: string;
   prompt: string;             // e.g. "The capital of France is ___ and currency is ___"
+  blanks: number;         // number of blanks to fill
   questionNumber?: number;
   onSubmit: (answer: string[]) => void;
   disabled?: boolean;
@@ -19,8 +20,6 @@ export const FillBlanksQuestion = ({
   disabled,
 }: FillBlanksQuestionProps) => {
 
-  // split prompt into text + blanks
-  // "The capital is ___ and currency is ___"
   const parts = prompt.split(/___+/g);  // split by underscores
   const blanks = parts.length - 1;      // number of blanks
 

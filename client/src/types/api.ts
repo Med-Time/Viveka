@@ -15,6 +15,7 @@ export interface StartInterviewResponse {
   study_id: string;
   type?: QuestionType;
   question?: string;
+  options?: string[];
   concept?: string;
 }
 
