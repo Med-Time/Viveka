@@ -142,10 +142,6 @@ export default function AssistantPanel({ open, onClose, context }: Props) {
     });
   }
 
-  // ... (rest of your component remains the same) ...
-  // (Header, chat messages, composer input)
-  // ...
-
   return (
     <>
       <div
