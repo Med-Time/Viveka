@@ -6,7 +6,7 @@ ENV/
 .env/
 .venv/
 DB
-core
+
 .react-router/
 # Python cache files
 __pycache__/
