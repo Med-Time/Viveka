@@ -81,6 +81,20 @@ def subtopic_assignment(
     try:
         # Use the ID string from the document we just fetched
         crud.get_or_create_assignment_doc(study_id, str(user_doc["_id"]))
+
+        existing_doc = crud.get_assignment_doc(study_id)
+        try:
+            # Navigate to the specific quiz
+            chapter = existing_doc["chapters"][chapter_idx]
+            quiz = chapter["subtopic_quizzes"][subtopic_idx]
+            
+            # If questions exist and status is NOT 'completed', return them (Resume Mode)
+            if quiz.get("questions") and len(quiz["questions"]) > 0:
+                print(f"Resuming existing quiz for {study_id}...")
+                return SubtopicResponse(questions=quiz["questions"])
+        except (IndexError, KeyError):
+            pass # Data doesn't exist yet, proceed to generation
+        # -----------------------------------
         
         initial_state = {
             "study_id": study_id,
@@ -109,6 +123,17 @@ def chapter_assignment(
 ):
     try:
         crud.get_or_create_assignment_doc(study_id, str(user_doc["_id"]))
+
+        # --- RESUME CHECK (New Logic) ---
+        existing_doc = crud.get_assignment_doc(study_id)
+        try:
+            chapter_assignment = existing_doc["chapters"][chapter_idx]["chapter_level_assignment"]
+            if chapter_assignment.get("questions") and len(chapter_assignment["questions"]) > 0:
+                print(f"Resuming existing chapter assignment for {study_id}...")
+                return ChapterResponse(questions=chapter_assignment["questions"])
+        except (IndexError, KeyError):
+            pass 
+        # -----------------------------------
 
         initial_state = {
             "study_id": study_id,

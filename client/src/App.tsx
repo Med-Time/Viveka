@@ -16,6 +16,7 @@ import { ProtectedRoute } from "./components/Layout/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { safeGetJson } from "@/utils/storage";
+import AssignmentPage from "./features/assignment/AssignmentPage";
 
 const queryClient = new QueryClient();
 
@@ -110,7 +111,14 @@ export const App = () => {
                   </ProtectedRoute>
                 }
               />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {<Route
+                path="/study/:studyId/assignment/:level/:chapterIdx/:subtopicIdx?"
+                element={
+                  <ProtectedRoute>
+                    <AssignmentPage />
+                  </ProtectedRoute>
+                }
+              />}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

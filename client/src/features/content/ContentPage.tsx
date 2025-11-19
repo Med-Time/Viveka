@@ -180,6 +180,7 @@ export const ContentPage = () => {
   const currentIdx = Math.max(0, Math.min(totalSubtopics - 1, isNaN(subtopicIdx) ? 0 : subtopicIdx));
   const currentTitle = normalizedSubtopics[currentIdx]?.title || "";
   const currentContent = normalizedSubtopics[currentIdx]?.body || "";
+  const isLastSubtopic = currentIdx === totalSubtopics - 1;
 
   // Navigation (subtopic within chapter; if boundary, navigate to prev/next chapter)
   const goToSubtopic = (idx: number) => {
@@ -399,22 +400,47 @@ export const ContentPage = () => {
           <MarkdownRenderer content={currentContent || "No content for this subtopic."} />
         </Card>
 
-        <div className="flex items-center justify-between gap-4">
-          <Button variant="outline" onClick={handlePrevious} disabled={chapterIdx === 0 && currentIdx === 0}>
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Previous
-          </Button>
+  <div className="flex items-center justify-between gap-4">
+    {/* Previous Button */}
+    <Button variant="outline" onClick={handlePrevious} disabled={chapterIdx === 0 && currentIdx === 0}>
+      <ChevronLeft className="mr-2 h-4 w-4" />
+      Previous
+    </Button>
 
-          <Button variant="secondary" onClick={() => void handleComplete()}>
-            <Check className="mr-2 h-4 w-4" />
-            Mark Complete
-          </Button>
+    <div className="flex gap-2">
+      {/* Subtopic Quiz Button */}
+      <Button 
+        className="bg-blue-600 hover:bg-blue-700"
+        onClick={() => navigate(`/study/${studyID}/assignment/subtopic/${chapterIdx}/${currentIdx}`)}
+      >
+        Take Quiz
+      </Button>
 
-          <Button onClick={() => void handleNext()}>
-            Next
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
+      {/* Mark Complete */}
+      <Button variant="secondary" onClick={() => void handleComplete()}>
+        <Check className="mr-2 h-4 w-4" />
+        Mark Complete
+      </Button>
+    </div>
+
+    {/* Smart Next Button */}
+    {isLastSubtopic ? (
+      <Button 
+        className="bg-green-600 hover:bg-green-700"
+        onClick={() => {
+          navigate(`/study/${studyID}/assignment/chapter/${chapterIdx}/0`);
+        }}
+      >
+        Take Chapter Test
+        <ChevronRight className="ml-2 h-4 w-4" />
+      </Button>
+    ) : (
+      <Button onClick={() => void handleNext()}>
+        Next
+        <ChevronRight className="ml-2 h-4 w-4" />
+      </Button>
+    )}
+  </div>
       </div>
       <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </div>

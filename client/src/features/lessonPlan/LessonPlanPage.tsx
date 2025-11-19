@@ -253,19 +253,60 @@ export const LessonPlanPage = () => {
   }
 
   // --- rest of page follows: when lessonPlan exists you render it as before ---
-  return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
-          <p className="text-muted-foreground">
-            {lessonPlan.lesson_plan.overall_course_outcome}
-          </p>
-        </div>
+//   return (
+//     <div className="min-h-screen bg-background">
+//       <AppHeader />
+//       <div className="container mx-auto max-w-4xl px-4 py-8">
+//         <div className="mb-8">
+//           <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
+//           <p className="text-muted-foreground">
+//             {lessonPlan.lesson_plan.overall_course_outcome}
+//           </p>
+//         </div>
 
-        <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
+//         <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
+//       </div>
+//     </div>
+//   );
+// };
+
+
+  // ... inside LessonPlanPage.tsx
+
+return (
+  <div className="min-h-screen bg-background">
+    <AppHeader />
+    <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="mb-8">
+        <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
+        <p className="text-muted-foreground">
+          {lessonPlan.lesson_plan.overall_course_outcome}
+        </p>
       </div>
+
+      <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
+
+      {/* --- NEW: CAPSTONE PROJECT BUTTON --- */}
+      <div className="mt-12 p-8 border rounded-lg bg-muted/30 text-center">
+        <h2 className="text-2xl font-bold mb-4">🎉 Course Completion</h2>
+        <p className="text-muted-foreground mb-6">
+          Ready to prove your mastery? Take the final comprehensive capstone project.
+        </p>
+        <Button 
+          size="lg" 
+          className="w-full md:w-auto bg-purple-600 hover:bg-purple-700"
+          onClick={() => {
+            // Navigate to Subject Assignment
+            // We pass '0' for both chapter and subtopic indices as placeholders
+            navigate(`/study/${study_id}/assignment/subject/0/0`);
+          }}
+        >
+          Start Capstone Project
+        </Button>
+      </div>
+      {/* ----------------------------------- */}
+
     </div>
-  );
+  </div>
+);
 };

@@ -124,3 +124,44 @@ export interface LoginRequest {
   email: string;
   password: string;
 }
+
+
+
+
+// Matches 'QuestionOption' in backend
+export interface QuestionOption {
+  id: string;
+  text: string;
+}
+
+// Matches 'Question' in backend
+export interface Question {
+  question_id: string; // Backend gives this UUID
+  question_type: "mcq" | "fill_in_blank" | "open_ended";
+  question_text: string;
+  options?: QuestionOption[]; // Only present for MCQs
+  correct_answer: string;
+  explanation: string;
+  rubric?: string;
+}
+
+// Matches the response from /subtopic/..., /chapter/..., /subject/...
+export interface AssignmentResponse {
+  questions: Question[];
+}
+
+// Matches 'QuestionFeedback' in backend
+export interface QuestionFeedback {
+  question_id: string;
+  user_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+  feedback: string;
+  explanation: string;
+}
+
+// Matches 'SubmitAssignmentResponse' in backend
+export interface SubmitResponse {
+  overall_score: number;
+  feedback_list: QuestionFeedback[];
+}
