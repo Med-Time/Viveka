@@ -5,7 +5,8 @@ import { AppHeader } from "@/components/Layout/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LessonPlanList } from "@/components/Plan/LessonPlanList";
-import { BookOpen } from "lucide-react";
+// ADDED: Lock icon import
+import { BookOpen, Lock } from "lucide-react"; 
 import { lessonPlanApi } from "./lessonPlan.api";
 
 import { queryKeys } from "@/api/queryKeys";
@@ -85,17 +86,15 @@ export const LessonPlanPage = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // First: check whether a lesson plan already exists for this study.
-  // If it exists, enable the react-query fetch (setHasGenerated(true)) so the main query runs.
   useEffect(() => {
     if (!study_id) return;
     let mounted = true;
     (async () => {
       try {
-        // Try to fetch the lesson plan; if it exists, enable main query
         await lessonPlanApi.get(study_id);
         if (mounted) setHasGenerated(true);
       } catch (err) {
-        // If not found or error, we keep hasGenerated=false so UI shows generate button
+        // If not found or error, we keep hasGenerated=false
       }
     })();
     return () => {
@@ -109,29 +108,24 @@ export const LessonPlanPage = () => {
     enabled: hasGenerated && !!study_id,
   });
 
-  // --- generateMutation with onMutate + onSuccess + onError (updated per patch) ---
   const generateMutation = useMutation({
     mutationFn: () => lessonPlanApi.generate(study_id),
-    // run before the mutation request is sent
     onMutate: async () => {
-      setIsGenerating(true);      // show generating UI immediately
-      setHasGenerated(true);      // enable "generated" flow UI
+      setIsGenerating(true);
+      setHasGenerated(true);
     },
     onSuccess: async () => {
-      // generation finished on server — refresh the lesson plan
       setIsGenerating(false);
       toast({
         title: "Lesson plan generated",
         description: "Fetching your personalized plan...",
       });
-      // refetch the plan; allow a small delay so backend can finish DB writes
       setTimeout(() => {
         refetch();
       }, 1000);
     },
     onError: (err: any) => {
       setIsGenerating(false);
-      // mark as not generated so user can try again
       setHasGenerated(false);
       toast({
         title: "Failed to generate lesson plan",
@@ -141,13 +135,11 @@ export const LessonPlanPage = () => {
     },
   });
 
-  // --- handle to start generation (call from UI) ---
   const handleGeneratePlan = () => {
     if (!study_id) {
       toast({ title: "Error", description: "Missing study id", variant: "destructive" });
       return;
     }
-    // mark as started immediately (onMutate does this too, but double-safety)
     setIsGenerating(true);
     setHasGenerated(true);
     generateMutation.mutate();
@@ -155,7 +147,6 @@ export const LessonPlanPage = () => {
 
   const handleStartChapter = (chapterIdx: number) => {
     if (!lessonPlan) {
-      // fallback: go to chapter root
       navigate(`/content/${chapterIdx}/0`);
       return;
     }
@@ -164,18 +155,13 @@ export const LessonPlanPage = () => {
     const chapter = chapters[chapterIdx];
 
     if (!chapter || !Array.isArray(chapter.sub_topics) || chapter.sub_topics.length === 0) {
-      // no subtopics — go to chapter 0
       navigate(`/content/${chapterIdx}/0`);
       return;
     }
 
-    // Find index of first subtopic that is NOT completed
     const firstUncompleted = chapter.sub_topics.findIndex((st: any) => !Boolean(st.completed));
-
-    // If none uncompleted, go to last subtopic; otherwise go to first uncompleted
     const targetSubtopicIdx = firstUncompleted === -1 ? chapter.sub_topics.length - 1 : firstUncompleted;
 
-    // Persist current study id if not already
     if (!localStorage.getItem("current_study_id") && currentStudyId) {
       localStorage.setItem("current_study_id", currentStudyId);
     }
@@ -183,14 +169,8 @@ export const LessonPlanPage = () => {
     navigate(`/content/${chapterIdx}/${targetSubtopicIdx}`);
   };
 
-  // --- UI: show generating screen while generation is happening or plan not yet available ---
-  // Replaces previous separate `if (!hasGenerated && !isLoading)` / `if (isGenerating || isLoading)` / `if (!lessonPlan)` blocks
   if ((!hasGenerated && !isLoading) || isGenerating || (hasGenerated && !lessonPlan)) {
-    // Two main cases:
-    // 1) Not generated yet and not loading => show "generate" CTA
-    // 2) Generation started (isGenerating === true) OR hasGenerated true but lessonPlan not yet available => show "generating" UI
     if (!hasGenerated && !isLoading && !isGenerating) {
-      // original "Generate your lesson plan" CTA
       return (
         <div className="min-h-screen bg-background">
           <AppHeader />
@@ -221,7 +201,6 @@ export const LessonPlanPage = () => {
       );
     }
 
-    // Generating placeholder while backend is working
     return (
       <div className="min-h-screen bg-background">
         <AppHeader />
@@ -234,15 +213,9 @@ export const LessonPlanPage = () => {
                 This can take a minute — we'll let you know when it's ready.
               </p>
             </div>
-
-            <div className="flex gap-2justify-center mt-4">
-              <Button onClick={() => { /* optional: cancel flow if you support cancellation */ }} disabled>
-                Generating...
-              </Button>
-              <Button variant="outline" onClick={() => {
-                // allow user to go back to dashboard while generation continues in background
-                navigate("/");
-              }}>
+            <div className="flex gap-2 justify-center mt-4">
+              <Button disabled>Generating...</Button>
+              <Button variant="outline" onClick={() => navigate("/")}>
                 Back to Dashboard
               </Button>
             </div>
@@ -252,61 +225,56 @@ export const LessonPlanPage = () => {
     );
   }
 
-  // --- rest of page follows: when lessonPlan exists you render it as before ---
-//   return (
-//     <div className="min-h-screen bg-background">
-//       <AppHeader />
-//       <div className="container mx-auto max-w-4xl px-4 py-8">
-//         <div className="mb-8">
-//           <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
-//           <p className="text-muted-foreground">
-//             {lessonPlan.lesson_plan.overall_course_outcome}
-//           </p>
-//         </div>
+  // --- NEW LOGIC: Check if ALL chapters and subtopics are completed ---
+  const isCourseComplete = lessonPlan.lesson_plan.chapters.every((chapter: any) => 
+    chapter.sub_topics?.every((st: any) => Boolean(st.completed))
+  );
+  // ------------------------------------------------------------------
 
-//         <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
-//       </div>
-//     </div>
-//   );
-// };
+  return (
+    <div className="min-h-screen bg-background">
+      <AppHeader />
+      <div className="container mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-8">
+          <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
+          <p className="text-muted-foreground">
+            {lessonPlan.lesson_plan.overall_course_outcome}
+          </p>
+        </div>
 
+        <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
 
-  // ... inside LessonPlanPage.tsx
+        {/* --- UPDATED CAPSTONE PROJECT BUTTON SECTION --- */}
+        <div className={`mt-12 p-8 border rounded-lg text-center transition-all duration-200 ${isCourseComplete ? "bg-muted/30" : "bg-muted/10 opacity-75"}`}>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <h2 className="text-2xl font-bold">
+              {isCourseComplete ? "🎉 Course Completion" : "🔒 Capstone Project Locked"}
+            </h2>
+          </div>
+          
+          <p className="text-muted-foreground mb-6">
+            {isCourseComplete 
+              ? "Ready to prove your mastery? Take the final comprehensive capstone project."
+              : "Complete all chapters and subtopics above to unlock the final Capstone Project."}
+          </p>
 
-return (
-  <div className="min-h-screen bg-background">
-    <AppHeader />
-    <div className="container mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-bold">{lessonPlan.lesson_plan.subject_name}</h1>
-        <p className="text-muted-foreground">
-          {lessonPlan.lesson_plan.overall_course_outcome}
-        </p>
+          <Button 
+            size="lg" 
+            disabled={!isCourseComplete}
+            className={`w-full md:w-auto ${isCourseComplete ? "bg-purple-600 hover:bg-purple-700" : ""}`}
+            onClick={() => {
+              if (!isCourseComplete) return;
+              // Navigate to Subject Assignment
+              navigate(`/study/${study_id}/assignment/subject/0/0`);
+            }}
+          >
+            {!isCourseComplete && <Lock className="mr-2 h-4 w-4" />}
+            Start Capstone Project
+          </Button>
+        </div>
+        {/* ----------------------------------- */}
+
       </div>
-
-      <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
-
-      {/* --- NEW: CAPSTONE PROJECT BUTTON --- */}
-      <div className="mt-12 p-8 border rounded-lg bg-muted/30 text-center">
-        <h2 className="text-2xl font-bold mb-4">🎉 Course Completion</h2>
-        <p className="text-muted-foreground mb-6">
-          Ready to prove your mastery? Take the final comprehensive capstone project.
-        </p>
-        <Button 
-          size="lg" 
-          className="w-full md:w-auto bg-purple-600 hover:bg-purple-700"
-          onClick={() => {
-            // Navigate to Subject Assignment
-            // We pass '0' for both chapter and subtopic indices as placeholders
-            navigate(`/study/${study_id}/assignment/subject/0/0`);
-          }}
-        >
-          Start Capstone Project
-        </Button>
-      </div>
-      {/* ----------------------------------- */}
-
     </div>
-  </div>
-);
+  );
 };
