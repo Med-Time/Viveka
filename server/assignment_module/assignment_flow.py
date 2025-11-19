@@ -92,12 +92,14 @@ def fetch_data_for_generation(state: AssignmentState) -> AssignmentState:
     
     return state
 
+# server/assignment_module/assignment_flow.py
+
 def generate_assignment_llm(state: AssignmentState) -> AssignmentState:
     llm = state["llm"]
     level = state["assignment_level"]
     
     persona_summary = state["persona"].get("learner_profile_summary", "a general learner")
-    structured_llm = llm.with_structured_output(SubtopicResponse)
+    structured_llm = llm.with_structured_output(SubtopicResponse) # Ensure this matches your Schema import!
     
     prompt_template = ""
     prompt_input = {}
@@ -121,7 +123,12 @@ def generate_assignment_llm(state: AssignmentState) -> AssignmentState:
         - For 'open_ended', the `correct_answer` should be a "model answer" and you MUST provide a detailed `rubric`.
         - Provide a clear `explanation`.
         """
-        prompt_input = {"persona": persona_summary, "content": state["source_content"]}
+        # --- FIX IS HERE: Added "outcome" to the input ---
+        prompt_input = {
+            "persona": persona_summary, 
+            "content": state["source_content"],
+            "outcome": state.get("current_subtopic_outcome") or "Understand the key concepts of this section" 
+        }
         
     elif level == "chapter":
         prompt_template = """
@@ -144,12 +151,17 @@ def generate_assignment_llm(state: AssignmentState) -> AssignmentState:
         You are designing a final capstone project.
         Create 1 comprehensive 'open_ended' task (e.g., design document, project plan) integrating all previous concepts.
         """
-        prompt_input = {"persona": persona_summary, "questions": "\n".join(state["source_questions"])}
+        prompt_input = {
+            "persona": persona_summary, 
+            "questions": "\n".join(state["source_questions"])
+        }
         
     prompt = ChatPromptTemplate.from_template(prompt_template)
     chain = prompt | structured_llm
     response = chain.invoke(prompt_input)
-    generated_questions = response.questions
+    
+    # Handle the response wrapper logic (Schema dependent)
+    generated_questions = response.questions 
     
     for q in generated_questions:
         q.question_id = str(uuid.uuid4())
