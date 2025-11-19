@@ -48,7 +48,7 @@ def get_subtopics(lesson_plan, chapter_idx=0):
     return subtopics
 
 
-def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:None):
+def generate_content(persona, lesson_plan, subtopic, chapter_title, chapter_index, feedback=None):
     """Generate content using Google Gemini model based on persona, lesson plan, and subtopic."""
     agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2)
 
@@ -70,7 +70,7 @@ def generate_content(persona, lesson_plan, subtopic, chapter_title, feedback:Non
         --- Lesson Plan Context ---
         Subject: {lesson_plan['lesson_plan']['subject_name']}
         Chapter: {chapter_title}
-        Chapter Objective: {lesson_plan['lesson_plan']['chapters'][0]['chapter_objective']}
+        # Chapter Objective: {lesson_plan['lesson_plan']['chapters'][chapter_index]['chapter_outcome']}
 
         --- Subtopic to Cover ---
         Title: {subtopic['sub_topic_title']}
@@ -263,7 +263,7 @@ def main(study_id, chapter_idx=0):
         if cached:
             print(f"Using cached content for {subtopic_title}")
             continue
-        content = generate_content(persona, lesson_plan, subtopic, chapter_title, feedback=None)
+        content = generate_content(persona, lesson_plan, subtopic, chapter_title, chapter_idx, feedback=None)
         store_generated_content(study_id, chapter_title, subtopic_title, content)
         print(f"Generated and stored content for {subtopic_title}.md")
 
