@@ -181,6 +181,11 @@ export const ContentPage = () => {
   const currentTitle = normalizedSubtopics[currentIdx]?.title || "";
   const currentContent = normalizedSubtopics[currentIdx]?.body || "";
   const isLastSubtopic = currentIdx === totalSubtopics - 1;
+  const context={
+    studyId: studyID,
+    chapterIdx,
+    subtopicIdx: currentIdx,
+  }
 
   // Navigation (subtopic within chapter; if boundary, navigate to prev/next chapter)
   const goToSubtopic = (idx: number) => {
@@ -442,7 +447,7 @@ export const ContentPage = () => {
     )}
   </div>
       </div>
-      <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)}  context={context}/>
     </div>
   </div> 
   );
