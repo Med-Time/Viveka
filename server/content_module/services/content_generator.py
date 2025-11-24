@@ -50,7 +50,7 @@ def get_subtopics(lesson_plan, chapter_idx=0):
 
 def generate_content(persona, lesson_plan, subtopic, chapter_title, chapter_index, feedback=None):
     """Generate content using Google Gemini model based on persona, lesson plan, and subtopic."""
-    agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2)
+    agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.2)
 
     prompt = f"""
         You are an expert educational content creator. 

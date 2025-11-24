@@ -248,14 +248,14 @@ export const LessonPlanPage = () => {
         <div className={`mt-12 p-8 border rounded-lg text-center transition-all duration-200 ${isCourseComplete ? "bg-muted/30" : "bg-muted/10 opacity-75"}`}>
           <div className="flex items-center justify-center gap-2 mb-4">
             <h2 className="text-2xl font-bold">
-              {isCourseComplete ? "🎉 Course Completion" : "🔒 Capstone Project Locked"}
+              {isCourseComplete ? "🎉 Course Completion" : "🔒 Final Exam locked"}
             </h2>
           </div>
           
           <p className="text-muted-foreground mb-6">
             {isCourseComplete 
-              ? "Ready to prove your mastery? Take the final comprehensive capstone project."
-              : "Complete all chapters and subtopics above to unlock the final Capstone Project."}
+              ? "Ready to prove your mastery? Take the final comprehensive subject exam."
+              : "Complete all chapters and subtopics above to unlock the final Subject exam."}
           </p>
 
           <Button 
