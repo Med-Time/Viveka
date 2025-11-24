@@ -16,7 +16,6 @@ jobs:
 
       - name: Create HF Space repo structure
         env:
-          # --- FIX: Secrets must be defined in THIS step ---
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
@@ -32,16 +31,19 @@ jobs:
           cp -r ../server/* ./
           cp -r ../server/.* ./ 2>/dev/null || true
 
-          # Create .dockerignore (Optimizing the upload)
+          # --- FIX: REMOVE LARGE PREPROCESSING FILES ---
+          # This deletes the specific PDF or the whole preprocessing folder
+          # so it doesn't get pushed to Hugging Face.
+          rm -rf preprocessing
+          # ---------------------------------------------
+
+          # Create .dockerignore (Good practice)
           echo "__pycache__" > .dockerignore
           echo "*.pyc" >> .dockerignore
           echo ".git" >> .dockerignore
           echo ".github" >> .dockerignore
-          echo ".env" >> .dockerignore
           echo "venv" >> .dockerignore
-          echo "node_modules" >> .dockerignore
-          echo ".DS_Store" >> .dockerignore
-
+          
           # Ensure README exists
           if [ ! -f README.md ]; then
             echo "---" > README.md
@@ -63,5 +65,4 @@ jobs:
           git add .
           git commit -m "Deploy backend from GitHub @ $(date)"
 
-          # Push to HF
           git push --force https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/Anmol52490/viveka-backend main
