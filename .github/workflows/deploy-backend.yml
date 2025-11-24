@@ -1,0 +1,24 @@
+name: Sync Backend to Hugging Face
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**' # Only run when server files change
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Push to hub
+        uses: nateraw/huggingface-sync-action@v0.0.5
+        with:
+          github_repo_id: 'Med-Time/Viveka' # e.g. john/viveka
+          huggingface_repo_id: 'Anmol52490/viveka-backend' # e.g. john/viveka-backend
+          repo_type: space
+          space_sdk: docker
+          subdirectory: 'server' # <--- This is the magic part
+          hf_token: ${{ secrets.HF_TOKEN }}
