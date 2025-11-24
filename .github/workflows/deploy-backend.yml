@@ -7,25 +7,30 @@ on:
       - 'server/**' # Only run when server files change
 
 jobs:
-  sync-to-hub:
+  deploy-to-space:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
 
-      - name: Install Python and Hugging Face Hub CLI
+      - name: Install Python & Hugging Face CLI
         run: |
-          pip install huggingface_hub
+          pip install --upgrade huggingface_hub
 
       - name: Login to Hugging Face
         run: huggingface-cli login --token ${{ secrets.HF_TOKEN }}
 
-      - name: Upload Server Directory to Space
-        # This command uploads the local './server' folder to the root of the Space
+      - name: Deploy Server to Space
+        env:
+          HF_REPO_ID: 'Anmol52490/viveka-backend'
         run: |
-          huggingface-cli upload Anmol52490/viveka-backend ./server . \
+          # 1. Upload the ./server directory to the root (.) of the Space
+          # --repo-type space: Specifies we are uploading to a Space
+          # --commit-message: Keeps your history clean
+          
+          huggingface-cli upload $HF_REPO_ID ./server . \
             --repo-type space \
-            --commit-message "Sync backend from GitHub Actions"
+            --commit-message "Sync backend from GitHub Actions: ${{ github.sha }}"
