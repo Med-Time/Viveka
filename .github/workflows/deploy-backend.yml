@@ -1,36 +1,20 @@
-name: Sync Backend to Hugging Face
+name: Sync to Hugging Face hub
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'server/**' # Only run when server files change
+
+  # to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
-  deploy-to-space:
+  sync-to-hub:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
           lfs: true
-
-      - name: Install Python & Hugging Face CLI
-        run: |
-          pip install --upgrade huggingface_hub
-
-      - name: Login to Hugging Face
-        run: huggingface-cli login --token ${{ secrets.HF_TOKEN }}
-
-      - name: Deploy Server to Space
+      - name: Push to hub
         env:
-          HF_REPO_ID: 'Anmol52490/viveka-backend'
-        run: |
-          # 1. Upload the ./server directory to the root (.) of the Space
-          # --repo-type space: Specifies we are uploading to a Space
-          # --commit-message: Keeps your history clean
-          
-          huggingface-cli upload $HF_REPO_ID ./server . \
-            --repo-type space \
-            --commit-message "Sync backend from GitHub Actions: ${{ github.sha }}"
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: git push https://HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/Anmol52490/viveka-backend main
