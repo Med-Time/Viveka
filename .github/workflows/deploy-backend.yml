@@ -1,7 +1,6 @@
 name: Sync Backend to Hugging Face
 on:
   workflow_dispatch:
-  
   push:
     branches: [main]
     paths:
@@ -11,16 +10,22 @@ jobs:
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           lfs: true
-      - name: Push to hub
-        uses: nateraw/huggingface-sync-action@v0.0.5
-        with:
-          github_repo_id: 'Med-Time/Viveka' # e.g. john/viveka
-          huggingface_repo_id: 'Anmol52490/viveka-backend' # e.g. john/viveka-backend
-          repo_type: space
-          space_sdk: docker
-          subdirectory: 'server' # <--- This is the magic part
-          hf_token: ${{ secrets.HF_TOKEN }}
+
+      - name: Install Python and Hugging Face Hub CLI
+        run: |
+          pip install huggingface_hub
+
+      - name: Login to Hugging Face
+        run: huggingface-cli login --token ${{ secrets.HF_TOKEN }}
+
+      - name: Upload Server Directory to Space
+        # This command uploads the local './server' folder to the root of the Space
+        run: |
+          huggingface-cli upload Anmol52490/viveka-backend ./server . \
+            --repo-type space \
+            --commit-message "Sync backend from GitHub Actions"
