@@ -20,14 +20,16 @@ jobs:
           mkdir hf-space-tmp
           cd hf-space-tmp
 
-          # Initialize git
+          # Initialize git and FORCE branch name to main
           git init
+          git checkout -b main  # <--- THIS IS THE FIX
+          
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
 
           # Copy only the server/ contents to the root
           cp -r ../server/* ./
-          cp -r ../server/.* ./ 2>/dev/null || true  # Copy hidden files (like .dockerignore)
+          cp -r ../server/.* ./ 2>/dev/null || true
 
           # Ensure we have the required README with YAML header
           if [ ! -f README.md ]; then
@@ -51,9 +53,10 @@ jobs:
 
           # Add, commit, and push
           git add .
-          git status  # For debugging
+          git status
           git commit -m "Deploy backend from GitHub @ $(date)"
 
+          # Now this command will find the 'main' branch successfully
           git push --force https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/Anmol52490/viveka-backend main
 
       - name: Push to Hub
