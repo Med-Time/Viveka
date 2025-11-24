@@ -15,23 +15,34 @@ jobs:
           fetch-depth: 0
 
       - name: Create HF Space repo structure
+        env:
+          # --- FIX: Secrets must be defined in THIS step ---
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
-          # Create a clean directory for the HF Space
           mkdir hf-space-tmp
           cd hf-space-tmp
 
-          # Initialize git and FORCE branch name to main
           git init
-          git checkout -b main  # <--- THIS IS THE FIX
-          
+          git checkout -b main
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
 
-          # Copy only the server/ contents to the root
+          # Copy server contents
           cp -r ../server/* ./
           cp -r ../server/.* ./ 2>/dev/null || true
 
-          # Ensure we have the required README with YAML header
+          # Create .dockerignore (Optimizing the upload)
+          echo "__pycache__" > .dockerignore
+          echo "*.pyc" >> .dockerignore
+          echo ".git" >> .dockerignore
+          echo ".github" >> .dockerignore
+          echo ".env" >> .dockerignore
+          echo "venv" >> .dockerignore
+          echo "node_modules" >> .dockerignore
+          echo ".DS_Store" >> .dockerignore
+
+          # Ensure README exists
           if [ ! -f README.md ]; then
             echo "---" > README.md
             echo "title: Viveka Backend" >> README.md
@@ -41,26 +52,16 @@ jobs:
             echo "sdk: docker" >> README.md
             echo "app_port: 7860" >> README.md
             echo "---" >> README.md
-            echo "" >> README.md
-            echo "Backend for Viveka, powered by Docker." >> README.md
+            echo "Backend for Viveka" >> README.md
           fi
 
-          # Check if Dockerfile exists
           if [ ! -f Dockerfile ]; then
             echo "Error: Dockerfile not found in server/!"
             exit 1
           fi
 
-          # Add, commit, and push
           git add .
-          git status
           git commit -m "Deploy backend from GitHub @ $(date)"
 
-          # Now this command will find the 'main' branch successfully
+          # Push to HF
           git push --force https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/Anmol52490/viveka-backend main
-
-      - name: Push to Hub
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
-        run: echo "Push done in previous step."
