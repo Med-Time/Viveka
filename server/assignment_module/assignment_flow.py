@@ -148,7 +148,7 @@ def generate_assignment_llm(state: AssignmentState) -> AssignmentState:
         
     elif level == "subject":
         prompt_template = """
-        You are designing a final capstone project.
+        You are designing a final capstone project for basic mathematics subject from combination of mensuration, algebra and geometry. and make it interactive and engaging
         Create 1 comprehensive 'open_ended' task (e.g., design document, project plan) integrating all previous concepts.
         """
         prompt_input = {
