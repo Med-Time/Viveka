@@ -118,6 +118,53 @@ async def get_generated_content_by_subtopic(study_id: str, chapter_idx: int, ind
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving content: {str(e)}")
 
+@router.get("/{study_id}/{chapter_idx}/{subtopic_idx}/references")
+async def get_content_references(study_id: str, chapter_idx: int, subtopic_idx: int):
+    """
+    Fetch references for generated content of a chapter.
+    Returns all references from all subtopics in that chapter.
+    """
+    try:
+        from content_module.core.mongo import content_col
+        
+        content = content_col.find_one({
+            "study_id": study_id,
+            "chapter_idx": int(chapter_idx)
+        })
+        
+        if not content:
+            raise HTTPException(status_code=404, detail="No content found for this chapter")
+        
+        # Collect references from the specified subtopic
+        all_refs = []
+        generated = content.get("generated_content", [])
+        if isinstance(generated, list):
+            if 0 <= subtopic_idx < len(generated):
+                subtopic = generated[subtopic_idx]
+                if isinstance(subtopic, dict):
+                    refs = subtopic.get("references", [])
+                    if refs:
+                        all_refs.extend(refs)
+        
+        # Deduplicate by URL
+        seen_urls = set()
+        dedup_refs = []
+        for ref in all_refs:
+            url = ref.get("url") if isinstance(ref, dict) else None
+            if url and url in seen_urls:
+                continue
+            if url:
+                seen_urls.add(url)
+            dedup_refs.append(ref)
+        
+        return {"references": dedup_refs, "count": len(dedup_refs)}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving references: {str(e)}")
+
+
 @router.post("/progress/complete_subtopic")
 def mark_subtopic_complete(data: ProgressInput):
     study_id = data.study_id

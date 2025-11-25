@@ -1,6 +1,16 @@
 import { axiosClient } from "@/api/axiosClient";
 import { ChapterContent } from "@/types/api";
 
+export interface Reference {
+  title: string;
+  url?: string;
+  domain: string;
+  snippet: string;
+  source_type: "local" | "web";
+  verified: boolean;
+  score: number;
+}
+
 export const contentApi = {
   generate: async (sessionId: string, chapterIdx: number, index: number): Promise<void> => {
     await axiosClient.get(`/content/generate/${sessionId}/${chapterIdx}/${index}`);
@@ -18,6 +28,11 @@ export const contentApi = {
 
   get: async (sessionId: string, chapterIdx: number, index: number): Promise<ChapterContent> => {
     const response = await axiosClient.get<ChapterContent>(`/content/${sessionId}/${chapterIdx}/${index}`);
+    return response.data;
+  },
+
+  getReferences: async (sessionId: string, chapterIdx: number, subtopicIdx: number): Promise<{references: Reference[], count: number}> => {
+    const response = await axiosClient.get(`/content/${sessionId}/${chapterIdx}/${subtopicIdx}/references`);
     return response.data;
   },
 };

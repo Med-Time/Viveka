@@ -56,5 +56,5 @@ def generate_and_save_content(study_id: str, chapter_idx: int, subtopic_idx: int
     content_id = save_generated_content(response_data)
     out = response_data.model_dump()
     out["content_id"] = content_id
-    out["saved_at"] = datetime.utcnow().isoformat()
+    out["saved_at"] = datetime.now().isoformat()
     return out

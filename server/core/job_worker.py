@@ -5,6 +5,8 @@ import traceback
 from pymongo import ReturnDocument
 
 from core.mongo import generation_jobs
+from core.mongo import generated_content_col
+from bson import ObjectId
 
 # try to import helpers used by worker; fall back to graph-level invocation if helpers missing
 try:
@@ -17,12 +19,19 @@ try:
 except Exception:
     generate_and_save_content = None
 
+# try to import references helper
+try:
+    from content_module.core.references import find_references, enrich_and_verify
+except Exception:
+    find_references = None
+    enrich_and_verify = None
+
 STOP_EVENT = threading.Event()
 _worker_thread = None
 
 
 def _now():
-    return datetime.utcnow()
+    return datetime.now()
 
 
 def _claim_next_job():
@@ -80,6 +89,45 @@ def _process_job(job):
             sub = int(params.get("subtopic_idx", 0))
             if generate_and_save_content:
                 res = generate_and_save_content(study_id, ch, sub)
+                # optionally run reference finding (Qdrant-first, web fallback)
+                try:
+                    content_text = None
+                    # generated_content in response may be a dict or BaseModel dict
+                    gen = res.get("generated_content")
+                    if isinstance(gen, dict):
+                        content_text = gen.get("content") or gen.get("text")
+                    else:
+                        # fallback: try key access
+                        try:
+                            content_text = gen["content"]
+                        except Exception:
+                            content_text = None
+
+                    references = None
+                    if find_references and content_text:
+                        try:
+                            refs = find_references(content_text)
+                            if enrich_and_verify:
+                                refs = enrich_and_verify(refs)
+                            references = refs
+                        except Exception:
+                            references = None
+
+                    # persist references into generated_content document (if available)
+                    content_id = res.get("content_id")
+                    if references and content_id:
+                        try:
+                            generated_content_col.update_one(
+                                {"_id": ObjectId(content_id), "generated_content.index": int(sub)},
+                                {"$set": {"generated_content.$.references": references}}
+                            )
+                        except Exception:
+                            pass
+
+                except Exception:
+                    # non-fatal: continue even if reference step fails
+                    pass
+
                 _finish_job_success(job_id, {"content_id": res.get("content_id")})
             else:
                 raise RuntimeError("Content generator helper not available in worker")

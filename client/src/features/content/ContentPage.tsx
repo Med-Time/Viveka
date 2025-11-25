@@ -8,13 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut } from "lucide-react";
 import { contentApi } from "./content.api";
+import { ReferencesPanel } from "./ReferencesPanel";
 import { progressApi, ProgressCompleteRequest } from "./progress.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { safeGetJson, safeSetJson } from "@/utils/storage";
-// NEW import: lesson plan API
 import { lessonPlanApi } from "@/features/lessonPlan/lessonPlan.api";
-// NEW import: assignment API (used to check/generate subtopic assignment)
 import { assignmentApi } from "@/features/assignment/assignment.api";
 import Assistant from "../ai_assistant/assistant";
 import Assistant_style from "../ai_assistant/assistant_style.module.css";
@@ -33,6 +32,10 @@ export const ContentPage = () => {
   const validPersisted =
     persisted && userStudies.some((s: any) => s.study_id === persisted) ? persisted : null;
   const initial = validPersisted || userStudies?.[0]?.study_id || auth?.current_study_id || null;
+
+  const progressMutation = useMutation({
+    mutationFn: (payload: ProgressCompleteRequest) => progressApi.complete(payload),
+  });
 
   const [currentStudyId, setCurrentStudyId] = useState<string | null>(initial);
   const [fontSize, setFontSize] = useState(16);
@@ -187,6 +190,14 @@ export const ContentPage = () => {
     queryFn: () => lessonPlanApi.get(studyID),
     enabled: !!studyID,
     staleTime: 1000 * 60, // 1 minute
+  });
+
+  // NEW: fetch references for the current chapter
+  const { data: referencesData, isLoading: refsLoading, error: refsError } = useQuery({
+    queryKey: ["content-references", studyID, chapterIdx, subtopicIdx],
+    queryFn: () => contentApi.getReferences(studyID, chapterIdx, subtopicIdx),
+    enabled: !!studyID && hasGenerated === true,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // try various fields the backend might have used
@@ -399,6 +410,7 @@ export const ContentPage = () => {
 
   // Replace Mark Complete action: route user to subtopic quiz instead of immediately marking complete.
   const handleMarkCompleteClick = () => {
+    handleComplete();
     if (!studyID) {
       toast({ title: "Missing study", description: "Cannot start quiz: missing study id", variant: "destructive" });
       return;
@@ -413,7 +425,7 @@ export const ContentPage = () => {
   // Next button handlers: enforce quizTaken && quizPassed
   const onNextClickWhenLocked = () => {
     // keep toast as fallback for keyboard users who might attempt activation
-    toast({ title: "Take quiz first", description: "Please take and pass the subtopic quiz before moving to next.", variant: "warning" });
+    toast({ title: "Take quiz first", description: "Please take and pass the subtopic quiz before moving to next.", variant: "destructive" });
   };
 
   // NEW: enqueue assignment generation only the first time user opens this subtopic
@@ -518,114 +530,146 @@ export const ContentPage = () => {
       <div className={Assistant_style.container}>
         <button
           onClick={() => setAssistantOpen(true)}
-          style={{
-            position: "fixed",
-            right: 30,
-            top: 600,
-            zIndex: 80,
-            background: "#2563eb",
-            color: "#fff",
-            border: "none",
-            padding: "8px 12px",
-            borderRadius: 8,
-            cursor: "pointer",
-          }}
+          className="
+            fixed bottom-6 right-6 z-50
+            bg-blue-600 text-white
+            px-4 py-2 rounded-lg shadow-lg
+            hover:bg-blue-700
+            focus-visible:outline-none
+            focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500
+            "
+            type="button"
         >
           💬 AI Assistant
         </button>
-        <div className="container mx-auto max-w-4xl px-4 py-8">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold">{currentTitle}</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setFontSize(Math.max(12, fontSize - 2))}>
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setFontSize(Math.min(24, fontSize + 2))}>
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Main Content: 3 columns on large screens */}
+            <div className="lg:col-span-3">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-semibold">{currentTitle}</h1>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setFontSize(Math.max(12, fontSize - 2))}>
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setFontSize(Math.min(24, fontSize + 2))}>
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
 
-          <Card className="mb-6 p-8" style={{ fontSize: `${fontSize}px` }}>
-            <MarkdownRenderer content={currentContent || "No content for this subtopic."} />
-          </Card>
+              <Card className="mb-6 p-8" style={{ fontSize: `${fontSize}px` }}>
+                <MarkdownRenderer content={currentContent || "No content for this subtopic."} />
+              </Card>
 
-          <div className="flex items-center justify-between gap-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (currentIdx > 0) goToSubtopic(currentIdx - 1);
-                else if (chapterIdx > 0) navigate(`/content/${chapterIdx - 1}/0`);
-              }}
-              disabled={chapterIdx === 0 && currentIdx === 0}
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Previous
-            </Button>
-
-            <div className="flex gap-2">
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => {
-                  try {
-                    enqueueNextForNavigation();
-                  } catch (_) {}
-                  navigate(`/study/${studyID}/assignment/subtopic/${chapterIdx}/${currentIdx}`);
-                }}
-              >
-                Take Quiz
-              </Button>
-
-              {/* Mark Complete now opens the quiz as requested */}
-              {quizPassed ? (
-                <Button variant="secondary" disabled>
-                  <Check className="mr-2 h-4 w-4" />
-                  Completed
-                </Button>
-              ) : (
-                <Button variant="secondary" onClick={handleMarkCompleteClick}>
-                  <Check className="mr-2 h-4 w-4" />
-                  Mark Complete
-                </Button>
-              )}
-            </div>
-
-            {isLastSubtopic ? (
-              <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={() => {
-                  navigate(`/study/${studyID}/assignment/chapter/${chapterIdx}/0`);
-                }}
-              >
-                Take Chapter Test
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            ) : (
-              // Next button: disabled unless quizTaken && quizPassed
-              <span title={!quizTaken ? "Please take the quiz first" : "You must pass the quiz to proceed"}>
+              <div className="flex items-center justify-between gap-4">
                 <Button
+                  variant="outline"
                   onClick={() => {
-                    // Defensive: If user tries to click via keyboard/assistive tech, still guard
-                    if (!quizTaken || !quizPassed) {
-                      onNextClickWhenLocked();
+                    if (currentIdx > 0) goToSubtopic(currentIdx - 1);
+                    else if (chapterIdx > 0) navigate(`/content/${chapterIdx - 1}/0`);
+                  }}
+                  disabled={chapterIdx === 0 && currentIdx === 0}
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Previous
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      try {
+                        enqueueNextForNavigation();
+                      } catch (_) {}
+                      navigate(`/study/${studyID}/assignment/subtopic/${chapterIdx}/${currentIdx}`);
+                    }}
+                  >
+                    Take Quiz
+                  </Button>
+
+                  {/* Mark Complete now opens the quiz as requested */}
+                  {quizPassed ? (
+                    <Button variant="secondary" disabled>
+                      <Check className="mr-2 h-4 w-4" />
+                      Completed
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" onClick={handleMarkCompleteClick}>
+                      <Check className="mr-2 h-4 w-4" />
+                      Mark Complete
+                    </Button>
+                  )}
+                </div>
+                  
+                {isLastSubtopic ? (
+                  <span
+                  title={
+                    !quizTaken
+                      ? "Please take the quiz for this subtopic first"
+                      : !quizPassed
+                      ? "You must pass the quiz to attempt the chapter test"
+                      : ""
+                  }
+                  >
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      if (!quizTaken || !quizPassed) {
+                      onNextClickWhenLocked(); // reuse same toast logic
                       return;
                     }
-                    void handleNext();
-                  }}
-                  disabled={!(quizTaken && quizPassed)}
-                >
-                  Next
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </span>
-            )}
+                      navigate(`/study/${studyID}/assignment/chapter/${chapterIdx}/0`);
+                    }}
+                    disabled={!(quizTaken && quizPassed)}
+                  >
+                    Take Chapter Test
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  </span>
+                ) : (
+                  // Next button: disabled unless quizTaken && quizPassed
+                  <span title={!quizTaken ? "Please take the quiz first" : "You must pass the quiz to proceed"}>
+                    <Button
+                      onClick={() => {
+                        // Defensive: If user tries to click via keyboard/assistive tech, still guard
+                        if (!quizTaken || !quizPassed) {
+                          onNextClickWhenLocked();
+                          return;
+                        }
+                        void handleNext();
+                      }}
+                      disabled={!(quizTaken && quizPassed)}
+                    >
+                      Next
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <Button variant="outline"
+            className="fixed bottom-6 left-6 z-50 shadow-md"
+            onClick={() => navigate(`/lesson-plan`)}>
+              ← Back to Lesson Plan
+            </Button>
+            
+            {/* Sidebar: References Panel - 1 column on large screens, full width on mobile */}
+            <div className="lg:col-span-1 space-y-4">
+              <ReferencesPanel
+                references={referencesData?.references}
+                isLoading={refsLoading}
+                error={refsError?.message}
+              />
+            </div>
           </div>
-        </div>
 
         <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} context={context} />
       </div>
     </div>
+  </div>
   );
 };

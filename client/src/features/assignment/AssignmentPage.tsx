@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { SpeechTextarea } from "@/components/Question/SpeechTextarea";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 
@@ -313,12 +314,13 @@ export default function AssignmentPage() {
               )}
 
               {q.question_type === "open_ended" && (
-                <Textarea
-                  placeholder="Write your response here..."
+                <SpeechTextarea
+                  placeholder="Write or speak your response here..."
                   value={answers[q.question_id] || ""}
-                  onChange={(e) => handleAnswerChange(q.question_id, e.target.value)}
+                  onChange={(v: string) => handleAnswerChange(q.question_id, v)}
                   disabled={isReadOnly}
                   className="min-h-[100px]"
+                  ariaLabel={`Answer for question ${idx + 1}`}
                 />
               )}
 
