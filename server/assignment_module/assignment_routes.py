@@ -1,12 +1,11 @@
-# server/assignment_module/assignment_routes.py
-
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from auth.services import get_current_user
 from typing import Dict, Any
-from bson import ObjectId  # <--- Need this to convert string ID to MongoDB ID
-
-# FIX: Import 'user' directly from your mongo.py
-from core.mongo import user 
+from bson import ObjectId
+from datetime import datetime
+from core.mongo import user, generation_jobs
+from content_module.core.mongo import lesson_plans
+from lesson_plan_module.core.mongo_fetch import fetch_lesson_plan
 
 from .assignment_schema import (
     SubtopicResponse,
@@ -222,7 +221,100 @@ def submit_assignment(
                 study_id=study_id, 
                 chapter_idx=req.chapter_idx
             )
-            
+
+        # NEW: Evaluate subtopic pass/fail and persist status + enqueue next content
+        try:
+            # Only handle subtopic-level status here
+            if req.assignment_level == "subtopic" and req.subtopic_idx is not None:
+                # Reload assignment doc to read persisted score
+                assignment_doc = crud.get_assignment_doc(study_id)
+                chapter_idx = int(req.chapter_idx)
+                subtopic_idx = int(req.subtopic_idx)
+
+                # defensively navigate structure
+                passed = False
+                score = None
+                try:
+                    chapter = assignment_doc.get("chapters", [])[chapter_idx]
+                    subtopic = chapter.get("subtopic_quizzes", [])[subtopic_idx]
+                    score = float(subtopic.get("score", overall_score or 0))
+                except Exception:
+                    score = float(overall_score or 0)
+
+                # determine pass threshold — adjust as needed or make configurable
+                PASS_THRESHOLD = 60.0
+                passed = (score >= PASS_THRESHOLD)
+
+                # persist status into assignment doc (idempotent update)
+                try:
+                    status_field = f"chapters.{chapter_idx}.subtopic_quizzes.{subtopic_idx}.status"
+                    score_field = f"chapters.{chapter_idx}.subtopic_quizzes.{subtopic_idx}.score"
+                    updated_at_field = "updated_at"
+                    # mark completed if passed, otherwise mark attempted
+                    new_status = "completed" if passed else "attempted"
+                    crud.update_assignment_fields(study_id, {
+                        status_field: new_status,
+                        score_field: score,
+                        updated_at_field: datetime.utcnow()
+                    })
+                except Exception:
+                    # best-effort, do not block response
+                    pass
+
+                # If passed -> mark lesson_plan subtopic complete and enqueue next content generation
+                if passed:
+                    try:
+                        # mark lesson plan subtopic completed (if lesson_plan exists)
+                        lesson_plans.update_one(
+                            {"study_id": study_id},
+                            {"$set": {
+                                f"lesson_plan.chapters.{chapter_idx}.sub_topics.{subtopic_idx}.completed": True,
+                                f"lesson_plan.chapters.{chapter_idx}.sub_topics.{subtopic_idx}.completed_at": datetime.utcnow()
+                            }}
+                        )
+                    except Exception:
+                        # ignore failures for marking lesson plan
+                        pass
+
+                    # compute next indices using lesson plan if available
+                    try:
+                        lp = fetch_lesson_plan(study_id) or {}
+                        next_ch = chapter_idx
+                        next_sub = subtopic_idx + 1
+                        if lp and lp.get("lesson_plan") and isinstance(lp["lesson_plan"].get("chapters"), list):
+                            chapters = lp["lesson_plan"]["chapters"]
+                            curr_ch = chapters[chapter_idx] if chapter_idx < len(chapters) else None
+                            total_sub = len(curr_ch.get("sub_topics", [])) if curr_ch else 0
+                            if next_sub >= total_sub:
+                                next_ch = chapter_idx + 1
+                                next_sub = 0
+                    except Exception:
+                        # fallback simple increment
+                        next_ch = chapter_idx
+                        next_sub = subtopic_idx + 1
+
+                    # enqueue content generation for next subtopic idempotently
+                    try:
+                        next_job_key = f"content:{study_id}:{next_ch}:{next_sub}"
+                        existing = generation_jobs.find_one({"job_key": next_job_key, "type": "content"})
+                        if not existing:
+                            generation_jobs.insert_one({
+                                "job_key": next_job_key,
+                                "type": "content",
+                                "params": {"study_id": study_id, "chapter_idx": next_ch, "subtopic_idx": next_sub},
+                                "status": "queued",
+                                "progress": 0,
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow()
+                            })
+                    except Exception:
+                        # enqueue is best-effort; ignore failures
+                        pass
+
+        except Exception:
+            # any error in post-processing should not break assignment submit
+            pass
+
         return SubmitAssignmentResponse(
             overall_score=overall_score,
             feedback_list=feedback_list

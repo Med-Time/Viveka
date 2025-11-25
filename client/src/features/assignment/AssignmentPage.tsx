@@ -11,6 +11,12 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 
+// NEW imports
+import { contentApi } from "@/features/content/content.api";
+import { progressApi } from "@/features/content/progress.api";
+import { lessonPlanApi } from "@/features/lessonPlan/lessonPlan.api";
+import { safeGetJson } from "@/utils/storage";
+
 export default function AssignmentPage() {
   const { studyId, level, chapterIdx, subtopicIdx } = useParams();
   const navigate = useNavigate();
@@ -19,7 +25,44 @@ export default function AssignmentPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ score: number; feedback: QuestionFeedback[] } | null>(null);
+  const [markingProgress, setMarkingProgress] = useState(false);
+
+  // result now includes whether passed and nextRoute for navigation
+  const [result, setResult] = useState<
+    | {
+        score: number;
+        feedback: QuestionFeedback[];
+        passed: boolean;
+        nextRoute?: string | null;
+      }
+    | null
+  >(null);
+
+  // NEW helper: enqueue next subtopic generation (idempotent, fire-and-forget)
+  const enqueueNextSubtopic = async (studyId: string, cIdx: number, sIdx?: number) => {
+    try {
+      const lp = await lessonPlanApi.get(studyId).catch(() => null);
+      let nextChapter = cIdx;
+      let nextSubtopic = (sIdx ?? -1) + 1;
+
+      if (lp && lp.lesson_plan && Array.isArray(lp.lesson_plan.chapters)) {
+        const chapters = lp.lesson_plan.chapters;
+        const chapter = chapters[cIdx];
+        const totalSub = chapter && Array.isArray(chapter.sub_topics) ? chapter.sub_topics.length : 0;
+        if (nextSubtopic >= totalSub) {
+          nextChapter = cIdx + 1;
+          nextSubtopic = 0;
+        }
+      } else {
+        if (typeof sIdx === "number") nextSubtopic = sIdx + 1;
+        else nextSubtopic = 0;
+      }
+
+      void contentApi.enqueue(studyId, nextChapter, nextSubtopic).catch(() => null);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // 1. Fetch Questions on Load
   useEffect(() => {
@@ -29,26 +72,29 @@ export default function AssignmentPage() {
       try {
         setLoading(true);
         let data;
-        
+
         if (level === "subtopic" && subtopicIdx) {
           data = await assignmentApi.getSubtopicQuiz(studyId, parseInt(chapterIdx), parseInt(subtopicIdx));
         } else if (level === "chapter") {
           data = await assignmentApi.getChapterTest(studyId, parseInt(chapterIdx));
+        } else if (level === "subject") {
+          data = await assignmentApi.getSubjectCapstone(studyId);
         }
-        else if (level === "subject") {
-  // We added this API method in the previous step (step 2)
-  // If typescript complains, check assignment.api.ts has 'getSubjectCapstone'
-  data = await assignmentApi.getSubjectCapstone(studyId);
-}
 
         if (data) {
           setQuestions(data.questions);
-          // Pre-fill answers if resuming a completed/partial quiz
           const existingAnswers: Record<string, string> = {};
-          data.questions.forEach(q => {
+          data.questions.forEach((q) => {
             if (q.user_response) existingAnswers[q.question_id] = q.user_response;
           });
           setAnswers(existingAnswers);
+
+          if (level === "subtopic") {
+            try {
+              const sIdxNum = subtopicIdx ? parseInt(subtopicIdx) : 0;
+              void enqueueNextSubtopic(studyId, parseInt(chapterIdx), sIdxNum);
+            } catch (_) {}
+          }
         }
       } catch (error) {
         console.error(error);
@@ -66,11 +112,44 @@ export default function AssignmentPage() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
+  // helper to compute next route (best-effort) but do NOT navigate here
+  const computeNextRoute = async () => {
+    if (!studyId || !chapterIdx) return null;
+    try {
+      const lp = await lessonPlanApi.get(studyId).catch(() => null);
+      let nextChapter = parseInt(chapterIdx);
+      let nextSubtopic = (subtopicIdx ? parseInt(subtopicIdx) : 0) + 1;
+      let totalSub = 0;
+
+      if (lp && lp.lesson_plan && Array.isArray(lp.lesson_plan.chapters)) {
+        const chapter = lp.lesson_plan.chapters[parseInt(chapterIdx)];
+        totalSub = chapter && Array.isArray(chapter.sub_topics) ? chapter.sub_topics.length : 0;
+      }
+
+      if (totalSub === 0) {
+        try {
+          const cont = await contentApi.get(studyId, parseInt(chapterIdx), 0);
+          const generated = cont?.generated_content ?? cont?.content;
+          if (Array.isArray(generated)) totalSub = generated.length;
+        } catch (_) {}
+      }
+
+      if (nextSubtopic < totalSub) {
+        return `/content/${nextChapter}/${nextSubtopic}`;
+      } else {
+        // no more subtopics -> route to chapter test
+        return `/study/${studyId}/assignment/chapter/${chapterIdx}/0`;
+      }
+    } catch (err) {
+      // fallback
+      return null;
+    }
+  };
+
   // 3. Submit Quiz
   const handleSubmit = async () => {
     if (!studyId || !chapterIdx) return;
-    
-    // Validate all answered? (Optional, maybe just warn)
+
     if (Object.keys(answers).length < questions.length) {
       toast({ title: "Please answer all questions", variant: "destructive" });
       return;
@@ -89,21 +168,87 @@ export default function AssignmentPage() {
       };
 
       const response = await assignmentApi.submitAssignment(studyId, payload);
+
+      // compute whether passed (no navigation/marking here)
+      const passingThreshold = 60; // adjust if needed
+      const passed = response.overall_score >= passingThreshold;
+
+      // attempt to compute nextRoute (best-effort) but do not navigate
+      const nextRoute = await computeNextRoute();
+
       setResult({
         score: response.overall_score,
         feedback: response.feedback_list,
+        passed,
+        nextRoute,
       });
+
       toast({ title: "Quiz Submitted!", description: `Score: ${response.overall_score}%` });
-      
-      // Scroll to top to see results
       window.scrollTo(0, 0);
-      
     } catch (error) {
       console.error(error);
       toast({ title: "Submission failed", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Handler for clicking Next Subtopic: mark complete (idempotent) and navigate
+  const handleNextSubtopic = async () => {
+    if (!studyId || !chapterIdx) return;
+
+    setMarkingProgress(true);
+    try {
+      // best-effort fetch titles
+      let chapterTitle = `Chapter ${chapterIdx}`;
+      let subtopicTitle = `Subtopic ${subtopicIdx ?? 0}`;
+      try {
+        const contentResp = await contentApi.get(studyId, parseInt(chapterIdx), subtopicIdx ? parseInt(subtopicIdx) : 0);
+        if (contentResp) {
+          chapterTitle = contentResp.chapter_title ?? chapterTitle;
+          subtopicTitle = contentResp.title ?? contentResp.subtopic_title ?? subtopicTitle;
+        }
+      } catch (_) {}
+
+      // mark complete
+      try {
+        const user = safeGetJson("user") || {};
+        const progressPayload = {
+          user_id: user?.id || "",
+          study_id: studyId,
+          chapter_idx: parseInt(chapterIdx),
+          subtopic_idx: subtopicIdx ? parseInt(subtopicIdx) : 0,
+          chapter_title: chapterTitle,
+          subtopic_title: subtopicTitle,
+        };
+        await progressApi.complete(progressPayload);
+        toast({ title: "Marked complete", description: `${subtopicTitle}` });
+      } catch (err) {
+        console.error("Failed to mark progress:", err);
+        // proceed anyway
+      }
+
+      // finally navigate to nextRoute if available, else fallback
+      if (result?.nextRoute) {
+        navigate(result.nextRoute);
+      } else {
+        // fallback: try to go to next subtopic path computed optimistically
+        const fallback = `/study/${studyId}/assignment/chapter/${chapterIdx}/0`;
+        navigate(fallback);
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Could not go to next subtopic", variant: "destructive" });
+    } finally {
+      setMarkingProgress(false);
+    }
+  };
+
+  // Handler to review lesson (go back to content for the same subtopic)
+  const handleReviewLesson = () => {
+    if (!chapterIdx) return;
+    const sIdx = subtopicIdx ? parseInt(subtopicIdx) : 0;
+    navigate(`/content/${chapterIdx}/${sIdx}`);
   };
 
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
@@ -120,9 +265,8 @@ export default function AssignmentPage() {
       </div>
 
       {questions.map((q, idx) => {
-        // Find feedback for this question if results exist
-        const qFeedback = result?.feedback.find(f => f.question_id === q.question_id);
-        const isReadOnly = !!result; // Disable inputs if result exists
+        const qFeedback = result?.feedback.find((f) => f.question_id === q.question_id);
+        const isReadOnly = !!result;
 
         return (
           <Card key={q.question_id} className={qFeedback ? (qFeedback.is_correct ? "border-green-200 bg-green-50/30" : "border-red-200 bg-red-50/30") : ""}>
@@ -144,8 +288,6 @@ export default function AssignmentPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              
-              {/* RENDER BASED ON TYPE */}
               {q.question_type === "mcq" && q.options && (
                 <RadioGroup
                   value={answers[q.question_id] || ""}
@@ -180,36 +322,64 @@ export default function AssignmentPage() {
                 />
               )}
 
-              {/* FEEDBACK SECTION */}
               {qFeedback && (
                 <div className="mt-4 p-4 bg-muted/50 rounded-md text-sm">
                   <p className="font-semibold">Feedback:</p>
                   <p>{qFeedback.feedback}</p>
                   {!qFeedback.is_correct && (
                     <div className="mt-2 pt-2 border-t border-border/50">
-                       <p className="font-semibold text-muted-foreground">Explanation:</p>
-                       <p className="text-muted-foreground">{q.explanation}</p>
+                      <p className="font-semibold text-muted-foreground">Explanation:</p>
+                      <p className="text-muted-foreground">{q.explanation}</p>
                     </div>
                   )}
                 </div>
               )}
-
             </CardContent>
           </Card>
         );
       })}
 
+      {/* If no result yet, show submit */}
       {!result && (
         <Button onClick={handleSubmit} disabled={submitting} className="w-full md:w-auto" size="lg">
           {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Submit Assignment
         </Button>
       )}
-      
+
+      {/* Result UI: show different options depending on pass/fail */}
       {result && (
-        <Button variant="outline" onClick={() => navigate(-1)} className="w-full md:w-auto">
-          Back to Content
-        </Button>
+        <div className="space-y-4">
+          <div className="p-4 rounded-md bg-muted/50">
+            <h2 className="text-xl font-semibold">Your result</h2>
+            <p className="mt-1">Score: <strong>{result.score.toFixed(1)}%</strong></p>
+            {result.passed ? (
+              <p className="mt-2 text-green-700">Congratulations — you passed! You can proceed to the next subtopic.</p>
+            ) : (
+              <p className="mt-2 text-red-700">You did not pass. We recommend reviewing the lesson and trying again.</p>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            {/* If passed, show Next Subtopic (which marks complete then navigates) */}
+            {result.passed ? (
+              <Button onClick={handleNextSubtopic} disabled={markingProgress} size="lg" className="flex-1">
+                {markingProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Next Subtopic
+              </Button>
+            ) : null}
+
+            {/* Always allow returning to content to review */}
+            <Button variant="outline" onClick={handleReviewLesson} className="flex-1" size="lg">
+              Review Lesson
+            </Button>
+
+            {/* Also keep a Back button */}
+            <Button variant="ghost" onClick={() => navigate(-1)} className="w-28">
+              Back
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

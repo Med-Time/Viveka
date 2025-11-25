@@ -78,7 +78,7 @@ export interface LessonPlan {
 export interface ChapterContent {
   study_id: string;
   chapter_idx: number;
-  chapter_title: string;
+  subtopic_title: string;
   generated_content: Record<string, string>;
 }
 

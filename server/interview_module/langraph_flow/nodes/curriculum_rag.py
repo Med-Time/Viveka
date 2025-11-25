@@ -1,5 +1,5 @@
 
-from interview_module.core.vector_Store import search_similar_chunks
+from interview_module.interview_core.vector_Store import search_similar_chunks
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 from interview_module.services.mongo_persistence import save_curriculum

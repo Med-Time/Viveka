@@ -1,69 +1,43 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from bson import ObjectId
 from content_module.core.mongo import sessions_col, lesson_plans
-from content_module.core.mongo_fetch import fetch_generated_content
+from content_module.core.mongo_fetch import fetch_generated_content, fetch_content_subtopic
 from content_module.core.mongo_persistence import save_generated_content
 from content_module.langgraph_flow.content_graph import graph
-from content_module.schemas import ContentInput, ContentResponse, ProgressInput
+from content_module.schemas import ContentInput, ContentResponse, ProgressInput, SubtopicContent
+from core.mongo import generation_jobs
+from bson import ObjectId
+from content_module.core.generation import generate_and_save_content
 
 router = APIRouter(
     prefix="/content",
     tags=["content"]
 )
 
-@router.get("/generate/{study_id}/{chapter_idx}")
-async def generate_content_route(study_id: str, chapter_idx: int):
+@router.get("/generate/{study_id}/{chapter_idx}/{index}")
+async def generate_content_route(study_id: str, chapter_idx: int, index: int):
     """
     Generate content for a specific chapter and save it to the database.
     """
     try:
-        study_data = sessions_col.find_one({"_id": ObjectId(study_id)})
-        if not study_data:
-            raise HTTPException(status_code=404, detail="study not found")
-        study_data["_id"] = str(study_data["_id"])
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid study ID: {str(e)}")
-    
-    state = ContentInput(
-        study_id=study_id,
-        user_id=study_data.get("user_id"),
-        chapter_idx=chapter_idx,
-        chapter_title="",
-        subtopic_title="",
-        generated_content=[],
-        content_grade=None,
-        content_feedback="",
-        average_score=0.0,
-        retry_count=0,
-        max_retries=3,
-        error=None
-    )
-
-    
-    print(f"Starting content generation for study: {study_id}, chapter: {chapter_idx}")
-    try:
-        result = graph.invoke(state)
-
-        response_data = ContentResponse(
-            study_id=study_id,
-            user_id= study_data.get("user_id"),
-            chapter_idx= chapter_idx,
-            chapter_title= result["chapter_title"],
-            generated_content= result["generated_content"],
-        )
-
-        response = response_data.model_dump()
-        try:
-            content_id = save_generated_content(response_data)
-            response["content_id"] = content_id
-            print(f'Response data: {response}')
-        except Exception as e:
-            response["save_error"] = str(e)
-        return response
-
+        # delegate to shared generator which validates session and saves
+        result = generate_and_save_content(study_id, chapter_idx, index)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {str(e)}")
+
+@router.get("/job/{job_id}")
+async def get_job_status(job_id: str):
+    try:
+        job = generation_jobs.find_one({"_id": ObjectId(job_id)})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job["_id"] = str(job["_id"])
+        return job
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{study_id}/{chapter_idx}")
 async def get_generated_content(study_id: str, chapter_idx: int):
@@ -90,21 +64,54 @@ async def get_generated_content_by_subtopic(study_id: str, chapter_idx: int, ind
         content = fetch_generated_content(study_id, chapter_idx)
         if not content:
             raise HTTPException(status_code=404, detail="No content found. Generate first.")
-        content.pop("_id", None)  # Remove MongoDB internal ID
-        content.pop("created_at", None)  # Remove created_at if not needed
-        response_data = ContentResponse(**content)
-        generated_list = response_data.generated_content  # List[SubtopicContent]
 
-        # Validate index and return requested subtopic
-        if not generated_list or index < 0 or index >= len(generated_list):
-            raise HTTPException(status_code=404, detail="Subtopic not found for given index.")
+        # defensive: ensure generated_content exists and index is valid
+        generated = content.get("generated_content")
+        # If generated is a dict with numbered keys or wrapper, try to normalize to list
+        if isinstance(generated, dict):
+            # common shape fallback: { "0": {...}, "1": {...} } -> convert to list by numeric keys
+            try:
+                numeric_keys = sorted([k for k in generated.keys() if k.isdigit()], key=lambda x: int(x))
+                generated_list = [generated[k] for k in numeric_keys] if numeric_keys else None
+                if generated_list:
+                    generated = generated_list
+            except Exception:
+                generated = None
 
-        subtopic = generated_list[index]
-        # support both Pydantic model and plain dict
-        title = getattr(subtopic, "title", None)
-        body = getattr(subtopic, "content", None)
+        if not isinstance(generated, list):
+            # if generated isn't a list, try fallback to top-level content array or single item
+            if isinstance(content.get("content"), list):
+                generated = content.get("content")
+            else:
+                # single-item fallback: wrap single content into list so index 0 can work
+                single_candidate = content.get("generated_content") or content.get("content")
+                if isinstance(single_candidate, (str, dict)):
+                    generated = [single_candidate]
+                else:
+                    generated = []
 
-        return {"title": title, "content": body}
+        if index < 0 or index >= len(generated):
+            raise HTTPException(status_code=404, detail="Subtopic not found")
+
+        # Now safely build the response using the validated list item
+        item = generated[index] or {}
+        chapter_title = content.get("chapter_title", "")
+        title = item.get("title", item.get("subtopic_title", "")) if isinstance(item, dict) else f"Subtopic {index + 1}"
+        body = ""
+        if isinstance(item, dict):
+            body = item.get("content") or item.get("text") or item.get("body") or ""
+        elif isinstance(item, str):
+            body = item
+        else:
+            body = str(item)
+
+        response_data = {
+            "chapter_title": chapter_title,
+            "title": title,
+            "content": body
+        }
+
+        return response_data
 
     except HTTPException:
         raise
@@ -138,3 +145,36 @@ def mark_subtopic_complete(data: ProgressInput):
         return {"status": "ok", "message": "No change (already completed)"}
 
     return {"status": "ok", "study_id": data.study_id, "chapter_idx": data.chapter_idx, "subtopic_idx": data.subtopic_idx, "message": "Subtopic marked as completed."}
+
+
+
+@router.post("/enqueue/{study_id}/{chapter_idx}/{index}")
+async def enqueue_content_generation(study_id: str, chapter_idx: int, index: int):
+    """
+    Enqueue content generation job for a given study/chapter/subtopic. Idempotent.
+    """
+    job_key = f"content:{study_id}:{chapter_idx}:{index}"
+
+    existing = generation_jobs.find_one({"job_key": job_key, "type": "content"})
+    if existing and existing.get("status") in ("queued", "processing", "claimed", "partial", "ready"):
+        existing["_id"] = str(existing["_id"])
+        return {"job_id": str(existing["_id"]), "status": existing.get("status"), "job": existing}
+
+    # naive attempt to grab user_id from session if available
+    try:
+        sess = sessions_col.find_one({"_id": ObjectId(study_id)})
+        user_id = sess.get("user_id") if sess else None
+    except Exception:
+        user_id = None
+
+    job_doc = {
+        "job_key": job_key,
+        "type": "content",
+        "params": {"study_id": study_id, "chapter_idx": chapter_idx, "subtopic_idx": index, "user_id": user_id},
+        "status": "queued",
+        "progress": 0,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    res = generation_jobs.insert_one(job_doc)
+    return {"job_id": str(res.inserted_id), "status": "queued"}

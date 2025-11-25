@@ -6,10 +6,10 @@ import { QuestionShell } from "./QuestionShell";
 interface FillBlanksQuestionProps {
   id: string;
   prompt: string;             // e.g. "The capital of France is ___ and currency is ___"
-  blanks: number;         // number of blanks to fill
   questionNumber?: number;
   onSubmit: (answer: string[]) => void;
   disabled?: boolean;
+  hint?: string;              
 }
 
 export const FillBlanksQuestion = ({
@@ -18,13 +18,14 @@ export const FillBlanksQuestion = ({
   questionNumber,
   onSubmit,
   disabled,
+  hint,
 }: FillBlanksQuestionProps) => {
-
-  const parts = prompt.split(/___+/g);  // split by underscores
-  const blanks = parts.length - 1;      // number of blanks
+  // split prompt into static parts separated by groups of underscores
+  const parts = prompt.split(/___+/g);
+  const blanksCount = Math.max(0, parts.length - 1);
 
   const [answers, setAnswers] = useState<string[]>(
-    Array(blanks).fill("")
+    Array(blanksCount).fill("")
   );
 
   const handleChange = (index: number, value: string) => {
@@ -34,32 +35,43 @@ export const FillBlanksQuestion = ({
   };
 
   const handleSubmit = () => {
-    const allFilled = answers.every((a) => a.trim());
+    const allFilled = answers.every((a) => a.trim() !== "");
     if (allFilled) onSubmit(answers);
   };
 
-  const allFilled = answers.every((a) => a.trim());
+  const allFilled = answers.every((a) => a.trim() !== "");
 
   return (
-    <QuestionShell type="fill_in_the_blanks" prompt={prompt} questionNumber={questionNumber}>
+    // NOTE: pass an empty prompt to QuestionShell so it won't duplicate the original text.
+    // If QuestionShell's prompt prop is optional you can omit it entirely.
+    <QuestionShell type="fill_in_the_blanks" prompt={""} questionNumber={questionNumber}>
       <div className="space-y-4">
+        {/* Render only the processed version (parts + inputs) */}
         <p className="leading-relaxed text-base">
           {parts.map((text, idx) => (
-            <span key={idx}>
+            <span key={idx} className="align-middle">
               {text}
-              {idx < blanks && (
+              {idx < blanksCount && (
                 <Input
                   id={`${id}-blank-${idx}`}
                   className="inline-block mx-2 w-40"
                   placeholder={`Blank ${idx + 1}`}
-                  value={answers[idx]}
+                  value={answers[idx] || ""}
                   onChange={(e) => handleChange(idx, e.target.value)}
                   disabled={disabled}
+                  aria-label={`Blank ${idx + 1}`}
                 />
               )}
             </span>
           ))}
         </p>
+
+        {/* Optional hint */}
+        {hint && (
+          <div className="text-sm text-muted-foreground mt-1 px-2">
+            <strong>Hint:</strong> {hint}
+          </div>
+        )}
       </div>
 
       <Button

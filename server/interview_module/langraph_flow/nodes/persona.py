@@ -2,7 +2,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 load_dotenv()
-from interview_module.core.mongo import persona_col
+from interview_module.interview_core.mongo import persona_col
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 from interview_module.services.mongo_persistence import save_persona

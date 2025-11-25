@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,13 +94,46 @@ export const LessonPlanPage = () => {
         await lessonPlanApi.get(study_id);
         if (mounted) setHasGenerated(true);
       } catch (err) {
-        // If not found or error, we keep hasGenerated=false
+        // If not found: enqueue generation silently and continue rendering
+        if (mounted) setHasGenerated(false);
+        try {
+          const res = await lessonPlanApi.enqueue(study_id);
+          const jobId = res.job_id;
+          toast({ title: "Lesson plan queued", description: "Generating your lesson plan in background." });
+
+          // poll job status in background
+          (async function poll() {
+            for (let i = 0; i < 60; i++) {
+              try {
+                const job = await lessonPlanApi.getJob(jobId);
+                if (job && job.status === "ready") {
+                  if (mounted) setHasGenerated(true);
+                  // invalidate and let react-query re-fetch
+                  queryClient.invalidateQueries(queryKeys.lessonPlan.get(study_id));
+                  toast({ title: "Lesson plan ready", description: "Your personalized plan is available." });
+                  break;
+                }
+                if (job && job.status === "failed") {
+                  toast({ title: "Generation failed", description: job.error || "See server logs.", variant: "destructive" });
+                  break;
+                }
+              } catch (_) {
+                // ignore
+              }
+              await new Promise((r) => setTimeout(r, 3000));
+            }
+          })();
+        } catch (e) {
+          // ignore enqueue errors for now
+        }
       }
     })();
     return () => {
       mounted = false;
     };
   }, [study_id]);
+
+  const queryClient = useQueryClient();
 
   const { data: lessonPlan, isLoading, refetch } = useQuery({
     queryKey: queryKeys.lessonPlan.get(study_id),

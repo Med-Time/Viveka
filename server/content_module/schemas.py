@@ -5,6 +5,13 @@ from typing import Dict, Optional, Any, Literal, List
 class ContentRequest(BaseModel):
     study_id: str
     chapter_idx: int
+    subtopic_idx: Optional[int]
+
+class SubtopicEvaluation(BaseModel):
+    score: int = Field(..., ge=1, le=10, description="Score from 1-10 for this subtopic.")
+    comments: str = Field(..., description="Concise comments on strengths and weaknesses.")
+    suggestions: str = Field(..., description="Concrete and actionable suggestions for improvement.")
+
 
 class SubtopicContent(BaseModel):
     index: int = Field(..., description="0-based index within the chapter.")
@@ -19,23 +26,21 @@ class ContentResponse(BaseModel):
     user_id: str
     chapter_idx: int
     chapter_title: str
-    generated_content: List[SubtopicContent]
+    subtopic_idx: int
+    generated_content: SubtopicContent
 
 
 class ContentInput(BaseModel):
     study_id: str = Field(..., description="The session/user ID")
     user_id: Optional[str] = Field(None, description="The user ID associated with the session")
     chapter_idx: int = Field(..., description="Index of the chapter to generate content for")
+    subtopic_idx: int = Field(..., description="Index of the subtopic to generate content for")
     chapter_title: Optional[str] = Field(None, description="Title of the chapter")
     subtopic_title: Optional[str] = Field(None, description="Title of the subtopic")
 
-    generated_content: List[SubtopicContent] = Field(
-        default_factory=list, description="List of subtopic content objects with title and content."
-    )
-    content_evaluations: Optional[Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Per-subtopic evaluation results from LLM {subtopic_title: {score, comments, suggestions}}.",
-    )
+    generated_content: Optional[SubtopicContent] = Field(None, description="The generated content for the subtopic.")
+    content_evaluation:Optional[SubtopicEvaluation] = Field(None, description="Evaluation of the generated content.")
+    
 
     content_grade: Optional[str] = Field(None, description="Overall evaluation grade — 'Good' or 'Bad'.")
     content_feedback: Optional[str] = Field(None, description="Overall evaluation feedback summary.")
@@ -71,16 +76,12 @@ class ContentInput(BaseModel):
             }
         }
 
-class SubtopicEvaluation(BaseModel):
-    score: int = Field(..., ge=1, le=10, description="Score from 1-10 for this subtopic.")
-    comments: str = Field(..., description="Concise comments on strengths and weaknesses.")
-    suggestions: str = Field(..., description="Concrete and actionable suggestions for improvement.")
-
-
 class ContentEvaluation(BaseModel):
+    subtopic_title: str = Field(..., description="Title of the subtopic being evaluated.")
     grade: Literal["Good", "Bad"] = Field(..., description="Overall content quality grade.")
-    feedback: str = Field(..., description="Summary feedback across all subtopics.")
-    metrics: Dict[str, SubtopicEvaluation] = Field(..., description="Per-subtopic structured evaluations.")
+    feedback: str = Field(..., description="Summary feedback for the content.")
+    evaluation: SubtopicEvaluation = Field(..., description="Subtopic structured evaluations.")
+    raw_response: Optional[str] = Field(None, description="Raw LLM response for debugging purposes.")
 
 class ProgressInput(BaseModel):
     user_id: str

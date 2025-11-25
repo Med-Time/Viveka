@@ -1,4 +1,4 @@
-from interview_module.core.vector_Store import search_similar_chunks
+from interview_module.interview_core.vector_Store import search_similar_chunks
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")

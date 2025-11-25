@@ -26,3 +26,5 @@ assignment = db["assignments"]
 content_col = db["generated_content"]
 assignments_col = db["assignments"]
 generated_content_col = db["generated_content"]
+# Central collection for background generation jobs
+generation_jobs = db["generation_jobs"]

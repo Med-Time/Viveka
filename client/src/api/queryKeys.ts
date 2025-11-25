@@ -10,7 +10,7 @@ export const queryKeys = {
     generate: (studyId: string) => ["lessonPlan", "generate", studyId],
   },
   content: {
-    get: (studyId: string, chapterIdx: number) => ["content", studyId, chapterIdx],
-    generate: (studyId: string, chapterIdx: number) => ["content", "generate", studyId, chapterIdx],
+    get: (studyId: string, chapterIdx: number, subtopicIdx: number) => ["content", studyId, chapterIdx, subtopicIdx],
+    generate: (studyId: string, chapterIdx: number, subtopicIdx: number) => ["content", "generate", studyId, chapterIdx, subtopicIdx],
   },
 };

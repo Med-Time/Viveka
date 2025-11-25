@@ -22,5 +22,6 @@ sessions_col = db["interview_sessions"]
 persona_col = db["persona_reports"]
 lesson_plans = db["lesson_plans"]
 content_col = db["generated_content"]
+generation_jobs = db["generation_jobs"]
 
     

@@ -1,6 +1,6 @@
 # core/mongo_fetch.py
 
-from interview_module.core.mongo import sessions_col, qa_col, persona_col
+from interview_module.interview_core.mongo import sessions_col, qa_col, persona_col
 from bson.objectid import ObjectId
 
 def fetch_session_details(session_id: str):

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+// src/features/content/ContentPage.tsx
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/Layout/AppHeader";
@@ -7,229 +8,249 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Check, ZoomIn, ZoomOut } from "lucide-react";
 import { contentApi } from "./content.api";
-import { progressApi, ProgressCompleteRequest } from "../content/progress.api";
+import { progressApi, ProgressCompleteRequest } from "./progress.api";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { safeGetJson, safeSetJson } from "@/utils/storage";
-import Assistant from '../ai_assistant/assistant';
-import Assistant_style from "../ai_assistant/assistant_style.module.css"
+// NEW import: lesson plan API
+import { lessonPlanApi } from "@/features/lessonPlan/lessonPlan.api";
+// NEW import: assignment API (used to check/generate subtopic assignment)
+import { assignmentApi } from "@/features/assignment/assignment.api";
+import Assistant from "../ai_assistant/assistant";
+import Assistant_style from "../ai_assistant/assistant_style.module.css";
+import { quizStatusApi } from "@/features/assignment/quizStatus.api";
 
 export const ContentPage = () => {
-  // Accept optional subtopic index in the URL: /content/:chapter_idx/:subtopic_idx
   const params = useParams<Record<string, string>>();
   const chapterIdx = parseInt(params.chapter_idx || "0", 10);
-  const subtopicIdx = parseInt(params.subtopic_idx || "0", 10); // default 0
+  const subtopicIdx = parseInt(params.subtopic_idx || "0", 10);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Prefer explicit selected study id in localStorage, fallback to user object
   const auth = safeGetJson("user") || {};
   const persisted = localStorage.getItem("current_study_id");
-  const userStudies: { study_id?: string; subject?: string; created_at?: string }[] = auth?.studies || [];
+  const userStudies = auth?.studies || [];
   const validPersisted =
-    persisted && userStudies.some((s) => s.study_id === persisted) ? persisted : null;
+    persisted && userStudies.some((s: any) => s.study_id === persisted) ? persisted : null;
   const initial = validPersisted || userStudies?.[0]?.study_id || auth?.current_study_id || null;
 
   const [currentStudyId, setCurrentStudyId] = useState<string | null>(initial);
-  const [showStudySelector, setShowStudySelector] = useState<boolean>(!Boolean(currentStudyId));
   const [fontSize, setFontSize] = useState(16);
-
-  useEffect(() => {
-    setShowStudySelector(!Boolean(currentStudyId) && userStudies && userStudies.length > 0);
-  }, [currentStudyId, userStudies]);
-
-  const handleSelectStudy = (id: string) => {
-    if (!id) return;
-    localStorage.setItem("current_study_id", id);
-    setCurrentStudyId(id);
-    setShowStudySelector(false);
-  };
-
-  // If no study selected, prompt user to choose or navigate to dashboard/onboarding
-  if (!currentStudyId) {
-    return (
-      <div className="min-h-screen bg-background">
-        <AppHeader />
-        <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
-          <Card className="max-w-md text-center">
-            <Card className="p-6 text-center">
-              <h2 className="text-xl font-semibold mb-4">Select a study to continue</h2>
-              {userStudies && userStudies.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  {userStudies.map((s, i) => (
-                    <div key={s.study_id || i} className="flex items-center justify-between gap-4">
-                      <div className="text-left">
-                        <div className="font-medium">{s.subject || `Study ${i + 1}`}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {s.created_at ? new Date(s.created_at).toLocaleString() : ""}
-                        </div>
-                      </div>
-                      <Button onClick={() => handleSelectStudy(s.study_id || "")}>Select</Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  <p className="mb-4 text-muted-foreground">No studies found. Start onboarding or create a study.</p>
-                  <div className="flex gap-2 justify-center">
-                    <Button onClick={() => navigate("/onboarding")}>Onboarding</Button>
-                    <Button variant="outline" onClick={() => navigate("/interview")}>Start Assessment</Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Use currentStudyId for queries and generation
   const studyID = currentStudyId;
 
   const [hasGenerated, setHasGenerated] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
 
   const { data: content, isLoading, refetch } = useQuery({
-    queryKey: queryKeys.content.get(studyID, chapterIdx),
-    queryFn: () => contentApi.get(studyID, chapterIdx),
+    queryKey: queryKeys.content.get(studyID, chapterIdx, subtopicIdx),
+    queryFn: () => contentApi.get(studyID, chapterIdx, subtopicIdx),
     enabled: hasGenerated === true && !!studyID,
   });
 
-  const generateMutation = useMutation({
-    mutationFn: () => contentApi.generate(studyID, chapterIdx),
-    onSuccess: () => {
-      setHasGenerated(true);
-      toast({
-        title: "Generating content",
-        description: "Your personalized lesson content is being created...",
-      });
-      setTimeout(() => {
-        refetch();
-      }, 2000);
-    },
-  });
+  // enqueue generation (non-blocking) and poll job status
+  const enqueueAndPoll = async () => {
+    if (!studyID) return null;
+
+    try {
+      const res = await contentApi.enqueue(studyID, chapterIdx, subtopicIdx);
+      const jobId = res.job_id;
+      toast({ title: "Generation queued", description: "Content generation is running in background." });
+
+      // poll job status until ready
+      let attempts = 0;
+      const maxAttempts = 60; // ~5 minutes at 5s interval
+      const interval = 5000;
+
+      while (attempts < maxAttempts) {
+        attempts += 1;
+        try {
+          const job = await contentApi.getJob(jobId);
+          if (!job) {
+            await new Promise((r) => setTimeout(r, interval));
+            continue;
+          }
+          if (job.status === "ready") {
+            setHasGenerated(true);
+            // refresh content
+            queryClient.invalidateQueries(queryKeys.content.get(studyID, chapterIdx, subtopicIdx));
+            toast({ title: "Content ready", description: "Your content has been generated." });
+            break;
+          }
+          if (job.status === "failed") {
+            toast({ title: "Generation failed", description: job.error || "See server logs.", variant: "destructive" });
+            break;
+          }
+        } catch (e) {
+          // ignore transient errors and keep polling
+        }
+        await new Promise((r) => setTimeout(r, interval));
+      }
+    } catch (e: any) {
+      toast({ title: "Failed to enqueue generation", description: e?.message || String(e), variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     if (!studyID) {
       setHasGenerated(false);
       return;
     }
+
     let mounted = true;
+
     (async () => {
       setChecking(true);
       try {
-        await contentApi.get(studyID, chapterIdx);
+        // Try to fetch existing content; non-blocking UI
+        // NOTE: check the returned payload for meaningful content; some backends
+        // may return 200 with empty payload rather than throwing a 404.
+        const existing = await contentApi.get(studyID, chapterIdx, subtopicIdx);
+
         if (!mounted) return;
-        setHasGenerated(true);
-      } catch (err) {
+
+        const hasMeaningfulContent =
+          existing &&
+          (
+            // common content fields we care about
+            (existing as any).generated_content ||
+            (existing as any).content ||
+            (existing as any).chapter_title ||
+            // or object with more than a couple of keys
+            (Object.keys(existing || {}).length > 0)
+          );
+
+        if (hasMeaningfulContent) {
+          setHasGenerated(true);
+        } else {
+          // treat empty/placeholder responses as "no content" and enqueue
+          setHasGenerated(false);
+          void enqueueAndPoll();
+        }
+      } catch (_err: any) {
         if (!mounted) return;
+        // No content yet or fetch error: enqueue generation silently (idempotent)
         setHasGenerated(false);
+        void enqueueAndPoll();
       } finally {
         if (mounted) setChecking(false);
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [studyID, chapterIdx]);
+  }, [studyID, chapterIdx, subtopicIdx]);
 
-  const handleGenerate = () => {
-    if (!studyID) {
-      toast({ title: "Error", description: "Missing session id", variant: "destructive" });
-      return;
-    }
-    generateMutation.mutate();
-  };
+  const normalizeGenerated = (raw: any): { title: string; body: string }[] => {
+    const out: { title: string; body: string }[] = [];
+    if (!raw) return out;
 
-  // Normalize generated_content into list of { title, body }
-  const generatedRaw = (content as any)?.generated_content;
-  const normalizedSubtopics: { title: string; body: string }[] = [];
-
-  if (generatedRaw) {
-    if (Array.isArray(generatedRaw)) {
-      generatedRaw.forEach((item: any, i: number) => {
-        if (typeof item === "string") {
-          normalizedSubtopics.push({ title: `Subtopic ${i + 1}`, body: item });
-        } else if (item && typeof item === "object") {
-          const title =
-            item.subtopic_title || item.title || item.sub_topic_title || item.name || `Subtopic ${i + 1}`;
-          const body = item.content || item.text || item.body || "";
-          normalizedSubtopics.push({ title, body });
-        } else {
-          normalizedSubtopics.push({ title: `Subtopic ${i + 1}`, body: String(item) });
-        }
+    if (Array.isArray(raw)) {
+      raw.forEach((item: any, i: number) => {
+        if (typeof item === "string") out.push({ title: `Subtopic ${i + 1}`, body: item });
+        else if (item && typeof item === "object") {
+          const title = item.title || item.subtopic_title || `Subtopic ${i + 1}`;
+          const body = item.content || item.text || item.body || JSON.stringify(item);
+          out.push({ title, body });
+        } else out.push({ title: `Subtopic ${i + 1}`, body: String(item) });
       });
-    } else if (generatedRaw && typeof generatedRaw === "object") {
-      Object.entries(generatedRaw).forEach(([k, v], i) => {
-        if (typeof v === "string") {
-          normalizedSubtopics.push({ title: k, body: v });
-        } else if (v && typeof v === "object") {
+      return out;
+    }
+
+    if (typeof raw === "object") {
+      // If raw is a wrapper like { title, content } or { chapter_title, generated_content }
+      if ((raw.title && raw.content) || (raw.chapter_title && raw.generated_content)) {
+        const generated = raw.generated_content ?? raw.content ?? raw.body ?? raw.text;
+        if (generated) return normalizeGenerated(generated);
+        const t = raw.title || raw.chapter_title || "Subtopic 1";
+        const b = raw.content || raw.generated_content || JSON.stringify(raw);
+        return [{ title: t, body: b }];
+      }
+
+      Object.entries(raw).forEach(([k, v]) => {
+        if (typeof v === "string") out.push({ title: k, body: v });
+        else if (v && typeof v === "object") {
           const body = v.content || v.text || v.body || JSON.stringify(v);
-          normalizedSubtopics.push({ title: k, body });
-        } else {
-          normalizedSubtopics.push({ title: k, body: String(v) });
-        }
+          out.push({ title: k, body });
+        } else out.push({ title: k, body: String(v) });
       });
-    } else if (typeof generatedRaw === "string") {
-      normalizedSubtopics.push({ title: (content as any).chapter_title || "Subtopic 1", body: generatedRaw });
+      return out;
     }
-  }
 
-  const totalSubtopics = normalizedSubtopics.length;
-  const currentIdx = Math.max(0, Math.min(totalSubtopics - 1, isNaN(subtopicIdx) ? 0 : subtopicIdx));
-  const currentTitle = normalizedSubtopics[currentIdx]?.title || "";
-  const currentContent = normalizedSubtopics[currentIdx]?.body || "";
-  const isLastSubtopic = currentIdx === totalSubtopics - 1;
-  const context={
-    studyId: studyID,
-    chapterIdx,
-    subtopicIdx: currentIdx,
-  }
-
-  // Navigation (subtopic within chapter; if boundary, navigate to prev/next chapter)
-  const goToSubtopic = (idx: number) => {
-    // update last_read before navigation
-    navigate(`/content/${chapterIdx}/${idx}`);
-    // reset state so page re-checks existence
-    setHasGenerated(null);
+    if (typeof raw === "string") return [{ title: "Subtopic 1", body: raw }];
+    return out;
   };
 
-  const handlePrevious = () => {
-    if (currentIdx > 0) {
-      goToSubtopic(currentIdx - 1);
-    } else if (chapterIdx > 0) {
-      // go to previous chapter last subtopic
-      navigate(`/content/${chapterIdx - 1}/0`);
-      setHasGenerated(null);
-    }
-  };
-
-  // PROGRESS MUTATION: writes completion to backend
-  const progressMutation = useMutation({
-    mutationFn: (payload: ProgressCompleteRequest) => progressApi.complete(payload),
-    onSuccess: (_data, variables) => {
-      // After saving to backend, invalidate relevant queries so lesson-plan / content reflect new state
-      // try {
-      //   // Invalidate content for this study/chapter
-      //   queryClient.invalidateQueries(queryKeys.content.get(variables.study_id, variables.chapterIdx));
-      // } catch {}
-      // try {
-      //   // Try to invalidate lesson-plan queries (if you have such a key)
-      //   queryClient.invalidateQueries(queryKeys.lessonPlan?.(variables.study_id) || ["lesson-plan", variables.study_id]);
-      // } catch {}
-    },
+  // NEW: fetch lesson plan in parallel (authoritative source for chapter/subtopic counts)
+  const { data: lessonPlan, isLoading: lpLoading, refetch: refetchLessonPlan } = useQuery({
+    queryKey: queryKeys.lessonPlan.get(studyID),
+    queryFn: () => lessonPlanApi.get(studyID),
+    enabled: !!studyID,
+    staleTime: 1000 * 60, // 1 minute
   });
 
-  // handleComplete now saves to backend, updates local last_read, and invalidates queries
+  // try various fields the backend might have used
+  const generatedRaw = (content as any)?.generated_content ?? (content as any)?.content ?? content;
+  const normalizedSubtopics = normalizeGenerated(generatedRaw);
+
+  // PRIMARY source of truth for total subtopics: lesson plan (if available)
+  const totalSubtopicsFromLessonPlan = (() => {
+    try {
+      if (lessonPlan && lessonPlan.lesson_plan && Array.isArray(lessonPlan.lesson_plan.chapters)) {
+        const ch = lessonPlan.lesson_plan.chapters[chapterIdx];
+        if (ch && Array.isArray(ch.sub_topics)) return ch.sub_topics.length;
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+    return undefined;
+  })();
+
+  // final totalSubtopics: prefer lesson plan count, else fall back to normalizedSubtopics length
+  const totalSubtopics = typeof totalSubtopicsFromLessonPlan === "number" && !isNaN(totalSubtopicsFromLessonPlan)
+    ? totalSubtopicsFromLessonPlan
+    : normalizedSubtopics.length;
+
+  // ensure currentIdx is bounded by authoritative totalSubtopics
+  const currentIdx = Math.max(0, Math.min(Math.max(0, totalSubtopics - 1), isNaN(subtopicIdx) ? 0 : subtopicIdx));
+
+  // Use normalized subtopic title/body as primary source.
+  const currentTitle = (content as any)?.title ??
+    (normalizedSubtopics[currentIdx] && normalizedSubtopics[currentIdx].title) ??
+    (content as any)?.subtopic_title ?? "";
+  const currentContent =
+    (normalizedSubtopics[currentIdx] && normalizedSubtopics[currentIdx].body) ?? (content as any)?.content ?? (content as any)?.body ?? "";
+
+  const isLastSubtopic = currentIdx === totalSubtopics - 1;
+
+  // Update enqueue logic: compute next using lesson-plan counts when available
+  const enqueueNextForNavigation = (overrideNextChapter?: number, overrideNextSubtopic?: number) => {
+    try {
+      let nextChapter = typeof overrideNextChapter === "number" ? overrideNextChapter : chapterIdx;
+      let nextSubtopic = typeof overrideNextSubtopic === "number" ? overrideNextSubtopic : currentIdx + 1;
+
+      // Use lesson plan to correct roll-over when subtopic exceeds chapter's sub_topics
+      if (lessonPlan && lessonPlan.lesson_plan && Array.isArray(lessonPlan.lesson_plan.chapters)) {
+        const chapters = lessonPlan.lesson_plan.chapters;
+        const currChapter = chapters[chapterIdx];
+        const currCount = currChapter && Array.isArray(currChapter.sub_topics) ? currChapter.sub_topics.length : 0;
+        if (currCount && nextSubtopic >= currCount) {
+          nextChapter = chapterIdx + 1;
+          nextSubtopic = 0;
+        }
+      }
+
+      // fire-and-forget enqueue; idempotent endpoint on server
+      void contentApi.enqueue(studyID || "", nextChapter, nextSubtopic).catch(() => null);
+    } catch (e) {
+      // noop - non-blocking
+    }
+  };
+
+  // handleComplete with optimistic update to lessonPlan
   const handleComplete = async () => {
-    const studyID = currentStudyId;
     if (!studyID) {
-      toast({
-        title: "Error",
-        description: "Missing study ID — please select a study first.",
-        variant: "destructive",
-      });
+      toast({ title: "Missing study ID", variant: "destructive" });
       return;
     }
 
@@ -237,12 +258,11 @@ export const ContentPage = () => {
       study_id: studyID,
       chapterIdx,
       subtopicIdx: currentIdx,
-      chapterTitle: (content as any)?.chapter_title || `Chapter ${chapterIdx}`,
-      subtopicTitle: currentTitle,
+      chapterTitle: (content as any)?.chapter_title ?? `Chapter ${chapterIdx}`,
+      subtopicTitle: currentTitle || `Subtopic ${currentIdx + 1}`,
     };
 
-    // 1) Persist to backend
-    const progressPayload: ProgressCompleteRequest = {
+    const payload: ProgressCompleteRequest = {
       user_id: auth?.id || "",
       study_id: newEntry.study_id,
       chapter_idx: newEntry.chapterIdx,
@@ -251,71 +271,203 @@ export const ContentPage = () => {
       subtopic_title: newEntry.subtopicTitle,
     };
 
+    // --- optimistic update: update lesson plan cache immediately ---
+    const lessonPlanKey = queryKeys.lessonPlan.get(studyID);
+    const previousLessonPlan = queryClient.getQueryData<any>(lessonPlanKey);
+
+    // snapshot for rollback
+    const snapshot = previousLessonPlan ? JSON.parse(JSON.stringify(previousLessonPlan)) : null;
+
+    if (previousLessonPlan && previousLessonPlan.lesson_plan && Array.isArray(previousLessonPlan.lesson_plan.chapters)) {
+      try {
+        const chapters = previousLessonPlan.lesson_plan.chapters.map((ch: any, idx: number) => {
+          if (idx !== chapterIdx) return ch;
+          // clone chapter
+          const cloned = { ...ch, sub_topics: Array.isArray(ch.sub_topics) ? [...ch.sub_topics] : [] };
+          // ensure subtopics exist
+          if (!Array.isArray(cloned.sub_topics)) cloned.sub_topics = [];
+          // mark the specific subtopic as completed
+          cloned.sub_topics = cloned.sub_topics.map((sub: any, sidx: number) => {
+            if (sidx !== currentIdx) return sub;
+            return {
+              ...sub,
+              completed: true,
+              completed_at: new Date().toISOString(),
+            };
+          });
+          return cloned;
+        });
+
+        // apply optimistic update
+        const optimistic = {
+          ...previousLessonPlan,
+          lesson_plan: {
+            ...previousLessonPlan.lesson_plan,
+            chapters,
+          },
+        };
+        queryClient.setQueryData(lessonPlanKey, optimistic);
+      } catch (e) {
+        // if optimistic update fails, ignore and proceed to network call
+      }
+    }
+
+    // also update local last_read immediately (same as before)
+    const existingData = safeGetJson("last_read");
+    let updatedData: any[] = [];
+    if (Array.isArray(existingData)) {
+      const index = existingData.findIndex((i) => i.study_id === studyID);
+      if (index !== -1) {
+        existingData[index] = newEntry;
+        updatedData = existingData;
+      } else updatedData = [...existingData, newEntry];
+    } else if (existingData && typeof existingData === "object" && existingData.study_id) {
+      updatedData = existingData.study_id === studyID ? [newEntry] : [existingData, newEntry];
+    } else updatedData = [newEntry];
+
+    safeSetJson("last_read", updatedData);
+
+    // Now call backend (mutate). If it fails, rollback optimistic lesson-plan update.
     try {
-      // Use mutateAsync to await success/failure
-      await progressMutation.mutateAsync(progressPayload);
-    } catch (err) {
+      await progressMutation.mutateAsync(payload);
+      toast({ title: "Progress saved!", description: `Marked complete: ${newEntry.subtopicTitle}` });
+    } catch (err: any) {
+      // rollback optimistic change if we have snapshot
+      if (snapshot) {
+        queryClient.setQueryData(lessonPlanKey, snapshot);
+      }
       toast({
         title: "Failed to save progress",
         description: err instanceof Error ? err.message : "Could not save progress to server.",
         variant: "destructive",
       });
-      // Still continue to update local storage — up to you; I'll still save locally
     }
-
-    // 2) Update local last_read (array-per-study format)
-    const existingData = safeGetJson("last_read");
-
-    let updatedData: any[] = [];
-
-    if (Array.isArray(existingData)) {
-      // Check if this study already exists
-      const index = existingData.findIndex((item) => item.study_id === studyID);
-      if (index !== -1) {
-        // Overwrite the existing record
-        existingData[index] = newEntry;
-        updatedData = existingData;
-      } else {
-        // Append new study progress
-        updatedData = [...existingData, newEntry];
-      }
-    } else if (existingData && typeof existingData === "object" && existingData.study_id) {
-      // Old format (single object) — migrate to array
-      if (existingData.study_id === studyID) {
-        updatedData = [newEntry];
-      } else {
-        updatedData = [existingData, newEntry];
-      }
-    } else {
-      // No existing data — create new entry
-      updatedData = [newEntry];
-    }
-
-    safeSetJson("last_read", updatedData);
-    progressMutation.mutate(progressPayload);
-
-    // 3) Invalidate lesson-plan & content queries (already attempted in onSuccess, but re-run here to be safe)
-
-    toast({
-      title: "Progress saved!",
-      description: `Marked complete: ${newEntry.subtopicTitle}`,
-    });
   };
 
-  const handleNext = async () => {
-    if (currentIdx + 1 < totalSubtopics) {
-      // Wait for complete to finish, then navigate to next subtopic
-      goToSubtopic(currentIdx + 1);
-    } else {
-      // move to next chapter first subtopic
-      navigate(`/content/${chapterIdx + 1}/0`);
-      setHasGenerated(null);
-    }
+  const goToSubtopic = (idx: number) => {
+    navigate(`/content/${chapterIdx}/${idx}`);
+    setHasGenerated(null);
+  };
+
+  const handleNext = () => {
+    if (currentIdx + 1 < totalSubtopics) goToSubtopic(currentIdx + 1);
+    else navigate(`/content/${chapterIdx + 1}/0`);
   };
 
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const context = { studyId: studyID, chapterIdx, subtopicIdx: currentIdx };
 
-  if (checking || isLoading || generateMutation.isPending) {
+  // quiz state: whether user has taken the quiz for this subtopic and whether passed
+  const [quizTaken, setQuizTaken] = useState<boolean>(false);
+  const [quizPassed, setQuizPassed] = useState<boolean>(false);
+  const [quizLoading, setQuizLoading] = useState<boolean>(false);
+  const hoverToastShownRef = useRef<boolean>(false);
+
+  // fetch quiz status for current subtopic (non-blocking, best-effort)
+  useEffect(() => {
+    if (!studyID) {
+      setQuizTaken(false);
+      setQuizPassed(false);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      setQuizLoading(true);
+      try {
+        const resp = await quizStatusApi.get(studyID, chapterIdx, currentIdx).catch(() => ({ found: false, status: "From Frontend" }));
+        console.log("Quiz status response:", resp);
+        if (!mounted) return;
+        if (resp && resp.found) {
+          setQuizTaken(Boolean(resp.status.score !== null));
+          setQuizPassed(Boolean(resp.status?.passed));
+        } else {
+          setQuizTaken(false);
+          setQuizPassed(false);
+        }
+      } catch (e) {
+        // ignore - keep defaults
+        setQuizTaken(false);
+        setQuizPassed(false);
+      } finally {
+        if (mounted) setQuizLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [studyID, chapterIdx, currentIdx]);
+
+  // Replace Mark Complete action: route user to subtopic quiz instead of immediately marking complete.
+  const handleMarkCompleteClick = () => {
+    if (!studyID) {
+      toast({ title: "Missing study", description: "Cannot start quiz: missing study id", variant: "destructive" });
+      return;
+    }
+    // navigate to assignment (subtopic) so server will mark completion only if user passes there
+    try {
+      enqueueNextForNavigation(); // optimistic fire-and-forget enqueue for next (idempotent)
+    } catch (_) {}
+    navigate(`/study/${studyID}/assignment/subtopic/${chapterIdx}/${currentIdx}`);
+  };
+
+  // Next button handlers: enforce quizTaken && quizPassed
+  const onNextClickWhenLocked = () => {
+    // keep toast as fallback for keyboard users who might attempt activation
+    toast({ title: "Take quiz first", description: "Please take and pass the subtopic quiz before moving to next.", variant: "warning" });
+  };
+
+  // NEW: enqueue assignment generation only the first time user opens this subtopic
+  useEffect(() => {
+    if (!studyID) return;
+    // only run for a subtopic page (content page shows subtopic index)
+    const key = `assignment_generated:${studyID}:${chapterIdx}:${currentIdx}`;
+    const already = localStorage.getItem(key);
+    if (already) return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        // Check whether assignment already exists (idempotent check)
+        // assignmentApi.getSubtopicQuiz should return 200 if exists, 404/err if not
+        const exists = await assignmentApi.getSubtopicQuiz(studyID, chapterIdx, currentIdx)
+          .then(() => true)
+          .catch((err: any) => {
+            // treat 404 or other errors as "not exists" but avoid spamming logs
+            return false;
+          });
+
+        if (!mounted) return;
+
+        if (!exists) {
+          // Fire-and-forget enqueue generation (server endpoint is idempotent)
+          try {
+            // Try to call assignment generation endpoint if available
+            if (assignmentApi.generateSubtopic) {
+              void assignmentApi.generateSubtopic(studyID, chapterIdx, currentIdx).catch(() => null);
+            } else {
+              // fallback direct fetch to known route
+              void fetch(`/iiismart-assignment/subtopic/${encodeURIComponent(studyID)}/${chapterIdx}/${currentIdx}`, {
+                method: "POST",
+              }).catch(() => null);
+            }
+          } catch (_) {
+            // ignore enqueue failure (non-blocking)
+          }
+        }
+
+        // mark locally so we don't repeat checks in this browser
+        localStorage.setItem(key, "1");
+      } catch (_) {
+        // ignore errors
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [studyID, chapterIdx, currentIdx]);
+
+  if (checking || isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader />
@@ -338,8 +490,8 @@ export const ContentPage = () => {
         <div className="container mx-auto flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <Card className="p-6 text-center">
             <p className="text-muted-foreground mb-4">No content exists for this chapter yet.</p>
-            <Button onClick={handleGenerate} disabled={generateMutation.isPending}>
-              {generateMutation.isPending ? "Generating..." : "Generate Chapter Content"}
+            <Button onClick={() => void enqueueAndPoll()}>
+              Queue Generation
             </Button>
           </Card>
         </div>
@@ -360,95 +512,120 @@ export const ContentPage = () => {
     );
   }
 
-  // Render single subtopic
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
-       <div className={Assistant_style.container}>
-      <button
-        onClick={() => setAssistantOpen(true)}
-        style={{
-          position: 'fixed',
-          right: 30,
-          top: 600,
-          zIndex: 80,
-          background: '#2563eb',
-          color: '#fff',
-          border: 'none',
-          padding: '8px 12px',
-          borderRadius: 8,
-          cursor: 'pointer'
-        }}
-      >
-       💬 AI Assistant
-      </button>
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">{(content as any).chapter_title || `Chapter ${chapterIdx}`}</h1>
-            <div className="text-sm text-muted-foreground">
-              {currentTitle ? `${currentTitle} — Subtopic ${currentIdx + 1} of ${totalSubtopics}` : "No subtopic"}
+      <div className={Assistant_style.container}>
+        <button
+          onClick={() => setAssistantOpen(true)}
+          style={{
+            position: "fixed",
+            right: 30,
+            top: 600,
+            zIndex: 80,
+            background: "#2563eb",
+            color: "#fff",
+            border: "none",
+            padding: "8px 12px",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          💬 AI Assistant
+        </button>
+        <div className="container mx-auto max-w-4xl px-4 py-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold">{currentTitle}</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setFontSize(Math.max(12, fontSize - 2))}>
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setFontSize(Math.min(24, fontSize + 2))}>
+                <ZoomIn className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setFontSize(Math.max(12, fontSize - 2))}>
-              <ZoomOut className="h-4 w-4" />
+          <Card className="mb-6 p-8" style={{ fontSize: `${fontSize}px` }}>
+            <MarkdownRenderer content={currentContent || "No content for this subtopic."} />
+          </Card>
+
+          <div className="flex items-center justify-between gap-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (currentIdx > 0) goToSubtopic(currentIdx - 1);
+                else if (chapterIdx > 0) navigate(`/content/${chapterIdx - 1}/0`);
+              }}
+              disabled={chapterIdx === 0 && currentIdx === 0}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Previous
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setFontSize(Math.min(24, fontSize + 2))}>
-              <ZoomIn className="h-4 w-4" />
-            </Button>
+
+            <div className="flex gap-2">
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  try {
+                    enqueueNextForNavigation();
+                  } catch (_) {}
+                  navigate(`/study/${studyID}/assignment/subtopic/${chapterIdx}/${currentIdx}`);
+                }}
+              >
+                Take Quiz
+              </Button>
+
+              {/* Mark Complete now opens the quiz as requested */}
+              {quizPassed ? (
+                <Button variant="secondary" disabled>
+                  <Check className="mr-2 h-4 w-4" />
+                  Completed
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={handleMarkCompleteClick}>
+                  <Check className="mr-2 h-4 w-4" />
+                  Mark Complete
+                </Button>
+              )}
+            </div>
+
+            {isLastSubtopic ? (
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  navigate(`/study/${studyID}/assignment/chapter/${chapterIdx}/0`);
+                }}
+              >
+                Take Chapter Test
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              // Next button: disabled unless quizTaken && quizPassed
+              <span title={!quizTaken ? "Please take the quiz first" : "You must pass the quiz to proceed"}>
+                <Button
+                  onClick={() => {
+                    // Defensive: If user tries to click via keyboard/assistive tech, still guard
+                    if (!quizTaken || !quizPassed) {
+                      onNextClickWhenLocked();
+                      return;
+                    }
+                    void handleNext();
+                  }}
+                  disabled={!(quizTaken && quizPassed)}
+                >
+                  Next
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </span>
+            )}
           </div>
         </div>
 
-        <Card className="mb-6 p-8" style={{ fontSize: `${fontSize}px` }}>
-          <MarkdownRenderer content={currentContent || "No content for this subtopic."} />
-        </Card>
-
-  <div className="flex items-center justify-between gap-4">
-    {/* Previous Button */}
-    <Button variant="outline" onClick={handlePrevious} disabled={chapterIdx === 0 && currentIdx === 0}>
-      <ChevronLeft className="mr-2 h-4 w-4" />
-      Previous
-    </Button>
-
-    <div className="flex gap-2">
-      {/* Subtopic Quiz Button */}
-      <Button 
-        className="bg-blue-600 hover:bg-blue-700"
-        onClick={() => navigate(`/study/${studyID}/assignment/subtopic/${chapterIdx}/${currentIdx}`)}
-      >
-        Take Quiz
-      </Button>
-
-      {/* Mark Complete */}
-      <Button variant="secondary" onClick={() => void handleComplete()}>
-        <Check className="mr-2 h-4 w-4" />
-        Mark Complete
-      </Button>
-    </div>
-
-    {/* Smart Next Button */}
-    {isLastSubtopic ? (
-      <Button 
-        className="bg-green-600 hover:bg-green-700"
-        onClick={() => {
-          navigate(`/study/${studyID}/assignment/chapter/${chapterIdx}/0`);
-        }}
-      >
-        Take Chapter Test
-        <ChevronRight className="ml-2 h-4 w-4" />
-      </Button>
-    ) : (
-      <Button onClick={() => void handleNext()}>
-        Next
-        <ChevronRight className="ml-2 h-4 w-4" />
-      </Button>
-    )}
-  </div>
+        <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} context={context} />
       </div>
-      <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)}  context={context}/>
     </div>
-  </div> 
   );
 };

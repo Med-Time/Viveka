@@ -3,13 +3,11 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate
 from content_module.services.content_generator import fetch_persona_and_lesson
 from content_module.schemas import ContentEvaluation, SubtopicEvaluation
-from typing import Dict, Any
+from typing import Any, Optional
 import time
 
 # Initialize Evaluator LLM
 _eval_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1)
-
-# ---------------- Prompt Template ----------------
 _eval_parser = PydanticOutputParser(pydantic_object=ContentEvaluation)
 
 EVAL_PROMPT = """
@@ -34,25 +32,26 @@ EVAL_PROMPT = """
     {format_instructions}
 """
 
-# ---------------- Evaluator Function ----------------
 def validate_content_node(state):
     """
-    LangGraph Node: Evaluate the generated content for each subtopic.
-    Produces structured scores, comments, and an overall grade.
+    Simplified evaluator: assumes a single-subtopic generated_content object.
     """
-
     print(f"[Evaluator] Starting content evaluation for session: {getattr(state, 'study_id', 'unknown')}")
 
     try:
-        # ---------------- Basic Validation ----------------
+        # Basic sanity checks
         if not hasattr(state, "generated_content") or not state.generated_content:
             state.error = "No generated content found for evaluation."
             print("[Evaluator] ❌ Missing generated content.")
             return state
 
-        # ---------------- Context Fetch ----------------
+        # Ensure retry_count exists
+        if not hasattr(state, "retry_count") or state.retry_count is None:
+            state.retry_count = 0
+
+        # Fetch persona & lesson context
         persona, lesson_plan = fetch_persona_and_lesson(state.study_id, getattr(state, "user_id", None))
-        # Build full persona context (mirrors generator input)
+
         persona_summary = f"""
             Goal: {lesson_plan.get('goal', 'General Learning')}
             Level: {lesson_plan.get('level', 'Beginner')}
@@ -64,143 +63,83 @@ def validate_content_node(state):
             Engagement and Confidence: {persona.get('engagement_and_confidence', 'N/A')}
         """
 
-
+        # Chapter title (infer if missing)
         chapter_title = getattr(state, "chapter_title", None)
         if not chapter_title:
-            # Infer from lesson plan
             chapter_idx = getattr(state, "chapter_idx", 0)
             chapter_title = lesson_plan["lesson_plan"]["chapters"][chapter_idx]["chapter_title"]
 
-        print(f"[Evaluator] Evaluating Chapter: {chapter_title}")
+        # Extract single-subtopic from state.generated_content
+        gen = state.generated_content
+        # Accept dict shape or object with attributes
+        if isinstance(gen, dict):
+            subtopic_title = gen.get("title") or gen.get("subtopic_title") or getattr(state, "subtopic_title", None) or "subtopic_0"
+            subtopic_content = gen.get("content") or gen.get("text") or gen.get("body") or ""
+        else:
+            # object-like (Pydantic SubtopicContent)
+            subtopic_title = getattr(gen, "title", None) or getattr(state, "subtopic_title", None) or "subtopic_0"
+            subtopic_content = getattr(gen, "content", None) or getattr(gen, "text", None) or str(gen)
 
-        # ---------------- Setup Prompt Template ----------------
+        print(f"[Evaluator] Evaluating chapter '{chapter_title}', subtopic '{subtopic_title}'")
+
+        # Build prompt and call LLM
         format_instructions = _eval_parser.get_format_instructions()
         prompt_template = ChatPromptTemplate.from_template(EVAL_PROMPT)
-
-        evaluations: Dict[str, Any] = {}
-        subtopic_scores = []
-
-        # ---------------- Normalize generated_content ----------------
-        # Accept multiple shapes:
-        # - list of dicts: [{ "title"|"subtopic_title": ..., "content": ... }, ...]
-        # - list of Pydantic/SubtopicContent objects with attributes
-        # - dict mapping title -> content
-        gen = getattr(state, "generated_content", None)
-        normalized: Dict[str, str] = {}
-
-        if isinstance(gen, dict):
-            # { title: content | { content: ... } }
-            for k, v in gen.items():
-                if isinstance(v, str):
-                    normalized[k] = v
-                elif isinstance(v, dict):
-                    normalized[k] = v.get("content") or v.get("text") or ""
-                else:
-                    normalized[k] = str(v)
-        elif isinstance(gen, list):
-            for i, item in enumerate(gen):
-                if isinstance(item, dict):
-                    title = item.get("subtopic_title") or item.get("title") or f"subtopic_{i}"
-                    body = item.get("content") or item.get("text") or item.get("body") or ""
-                else:
-                    # assume object with attributes (Pydantic model or similar)
-                    title = getattr(item, "subtopic_title", None) or getattr(item, "title", None) or f"subtopic_{i}"
-                    body = getattr(item, "content", None) or getattr(item, "text", None) or ""
-                    if body is None:
-                        body = str(item)
-                # avoid duplicate keys by appending index
-                key = title if title not in normalized else f"{title}_{i}"
-                normalized[key] = body
-        else:
-            print("[Evaluator] ⚠️ generated_content has unexpected shape; skipping evaluation.")
-            state.error = "generated_content shape unsupported"
-            return state
-
-        # ---------------- Iterate Over Normalized Content ----------------
-        for subtopic_title, subtopic_content in normalized.items():
-            print(f"[Evaluator] → Evaluating subtopic: {subtopic_title}")
-
-            formatted_prompt = prompt_template.format(
-                persona_summary=persona_summary,
-                chapter_title=chapter_title,
-                subtopic_title=subtopic_title,
-                subtopic_content=subtopic_content,
-                format_instructions=format_instructions,
-            )
-
-            # Invoke LLM
-            response = _eval_llm.invoke(formatted_prompt)
-            time.sleep(2)  # to avoid rate limits
-
-            # Try parsing structured output
-            try:
-                eval_result: ContentEvaluation = _eval_parser.parse(response.content)
-            except Exception as e:
-                print(f"[Evaluator] ⚠️ Parsing failed for '{subtopic_title}': {e}")
-                eval_result = ContentEvaluation(
-                    grade="Bad",
-                    feedback="Parser failed to extract structured data.",
-                    metrics={
-                        subtopic_title: SubtopicEvaluation(
-                            score=1,
-                            comments="Failed to parse structured evaluation.",
-                            suggestions=str(e),
-                        )
-                    },
-                )
-
-            # Extract relevant subtopic metrics
-            if isinstance(eval_result, ContentEvaluation):
-                metric = None
-                if subtopic_title in eval_result.metrics:
-                    metric = eval_result.metrics[subtopic_title]
-                elif eval_result.metrics:
-                    # fallback: first metric in dict
-                    metric = next(iter(eval_result.metrics.values()))
-
-                if metric:
-                    evaluations[subtopic_title] = {
-                        "score": metric.score,
-                        "comments": metric.comments,
-                        "suggestions": metric.suggestions,
-                    }
-                    subtopic_scores.append(metric.score)
-                else:
-                    evaluations[subtopic_title] = {
-                        "score": 1,
-                        "comments": "No metrics found in output.",
-                        "suggestions": eval_result.feedback,
-                    }
-                    subtopic_scores.append(1)
-            else:
-                # Raw fallback
-                evaluations[subtopic_title] = {
-                    "score": 1,
-                    "comments": "Unexpected format from LLM.",
-                    "suggestions": str(response.content),
-                }
-                subtopic_scores.append(1)
-
-        # ---------------- Aggregate Results ----------------
-        avg_score = sum(subtopic_scores) / max(len(subtopic_scores), 1)
-        overall_grade = "Good" if avg_score >= 7 else "Bad"
-        overall_feedback = (
-            "Content meets learning and clarity standards."
-            if overall_grade == "Good"
-            else "Content needs improvements as per the evaluator suggestions."
+        formatted_prompt = prompt_template.format(
+            persona_summary=persona_summary,
+            chapter_title=chapter_title,
+            subtopic_title=subtopic_title,
+            subtopic_content=subtopic_content,
+            format_instructions=format_instructions,
         )
 
-        # ---------------- Update State ----------------
-        state.content_evaluations = evaluations
-        state.content_grade = overall_grade
-        state.content_feedback = overall_feedback
-        state.average_score = avg_score
-        state.retry_count = getattr(state, "retry_count", 0) + 1
+        response = _eval_llm.invoke(formatted_prompt)
+        # small wait to reduce rate-limit risk
+        time.sleep(2)
 
-        print(f"[Evaluator] ✅ Evaluation complete. Grade: {overall_grade}, Avg Score: {avg_score:.2f}")
+        # Try parsing structured output into single-subtopic ContentEvaluation
+        try:
+            eval_result: ContentEvaluation = _eval_parser.parse(response.content)
+        except Exception as e:
+            # Parsing failed — store a minimal fallback evaluation
+            print(f"[Evaluator] ⚠️ Parsing failed for '{subtopic_title}': {e}")
+            fallback = SubtopicEvaluation(score=1, comments="Parser failed to extract structured data.", suggestions=str(e))
+            state.content_evaluation = fallback
+            state.content_evaluation_title = subtopic_title
+            state.content_grade = "Bad"
+            state.content_feedback = "Parser failed to extract structured data."
+            state.average_score = 1.0
+            state.retry_count = getattr(state, "retry_count", 0) + 1
+            return state
+
+        # If parse succeeded, store structured single-subtopic evaluation on state
+        if isinstance(eval_result, ContentEvaluation):
+            eval_title = eval_result.subtopic_title or subtopic_title
+            state.content_evaluation = eval_result.evaluation
+            state.content_grade = eval_result.grade
+            state.content_feedback = eval_result.feedback
+            # average_score is the single score
+            try:
+                state.average_score = float(eval_result.evaluation.score)
+            except Exception:
+                state.average_score = None
+            state.retry_count = getattr(state, "retry_count", 0) + 1
+
+            print(f"[Evaluator] ✅ Evaluation stored for '{eval_title}': grade={state.content_grade} score={state.average_score}")
+            return state
+
+        # Fallback if eval_result not matching expected model
+        print("[Evaluator] ⚠️ Unexpected parsed result shape; using fallback evaluation.")
+        fallback = SubtopicEvaluation(score=0, comments="Unexpected parser output.", suggestions=str(response.content))
+        state.content_evaluation = fallback
+        state.content_evaluation_title = subtopic_title
+        state.content_grade = "Bad"
+        state.content_feedback = "Evaluator produced unexpected format."
+        state.average_score = 0.0
+        state.retry_count = getattr(state, "retry_count", 0) + 1
         return state
 
-    except Exception as e:
-        state.error = str(e)
-        print(f"[Evaluator] ❌ Exception: {e}")
+    except Exception as exc:
+        state.error = str(exc)
+        print(f"[Evaluator] ❌ Exception: {exc}")
         return state

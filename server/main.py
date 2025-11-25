@@ -8,6 +8,8 @@ from auth.routes import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from auth.services import get_current_user
 from assignment_module.assignment_routes import router as assignment_router
+from assignment_module.routes.quiz_status_routes import router as quiz_status_router
+from core.job_worker import start_worker, stop_worker
 app = FastAPI() 
 app.include_router(migrate_router)
 app.include_router(auth_router)
@@ -15,6 +17,7 @@ app.include_router(interview_router, dependencies=[Depends(get_current_user)], p
 app.include_router(lesson_plan_router, dependencies=[Depends(get_current_user)])
 app.include_router(content_router, dependencies=[Depends(get_current_user)])
 app.include_router(assignment_router, dependencies=[Depends(get_current_user)])
+app.include_router(quiz_status_router)
 app.include_router(assistant_router)
 
 origins = [
@@ -34,6 +37,17 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     print("✅ FastAPI server started. All modules initialized.")
+    # Start background job worker to process generation jobs
+    try:
+        start_worker()
+        print("✅ Background job worker started.")
+    except Exception as e:
+        print("❌ Failed to start job worker:", e)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("🛑 FastAPI server shutting down.")
+    stop_worker()
 
 @app.get("/")
 def health():

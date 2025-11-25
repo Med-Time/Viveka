@@ -4,6 +4,10 @@ from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
 from lesson_plan_module.core.mongo_fetch import fetch_lesson_plan
 from interview_module.services.mongo_persistence import save_lesson_plan
 from lesson_plan_module.langraph_flow.lesson_plan import xlesson_plan_graph
+from core.mongo import generation_jobs
+from datetime import datetime
+
+from lesson_plan_module.core.generation import generate_and_save_lesson_plan
 
 router = APIRouter(
     prefix="/lesson-plan",
@@ -15,112 +19,13 @@ router = APIRouter(
 async def generate_lesson_plan(study_id: str):
     """
     Generate a lesson plan for a specific session and save it to the database.
+    Delegates to shared helper to keep behavior identical to worker.
     """
-    # 1. Get session data
     try:
-        session_data = sessions_col.find_one({"_id": ObjectId(study_id)})
-        if not session_data:
-            raise HTTPException(status_code=404, detail=f"Session not found")
-        session_data["_id"] = str(session_data["_id"])
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid session ID: {str(e)}")
-
-    # 2. Get persona report
-    try:
-        persona_report = persona_col.find_one(
-            {"study_id": study_id},
-            sort=[("created_at", -1)]
-        )
-        if not persona_report:
-            raise HTTPException(status_code=404, detail="No persona report found")
-        persona_report_id = str(persona_report["_id"])
-        persona_report["_id"] = persona_report_id
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving persona report: {str(e)}")
-
-    # 3. Get Q&A and feedback history
-    try:
-        qa_history = list(qa_col.find(
-            {"study_id": study_id},
-            {
-                "concept": 1,
-                "question": 1,
-                "answer": 1,
-                "feedback": 1,
-                "score": 1,
-                "_id": 1
-            }
-        ).sort("created_at", 1))
-        
-        # Convert ObjectId to string for each item
-        for qa in qa_history:
-            if "_id" in qa:
-                qa["_id"] = str(qa["_id"])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving Q&A history: {str(e)}")
-
-    # 4. Prepare state for lesson plan generation
-    state = {
-        "study_id": study_id,
-        "user_id": session_data.get("user_id"),
-        "subject": session_data.get("subject"),
-        "goal": session_data.get("goal"),
-        "level": session_data.get("level"),
-        "persona_report": persona_report,
-        "feedback_history": qa_history,
-        "taken_test_curriculum": session_data.get("curriculum", [])
-    }
-
-    # 5. Generate lesson plan
-    try:
-        result = xlesson_plan_graph.invoke(state)
-        
-        # 6. Prepare response data
-        lesson_plan = result.get("lesson_plan")
-        lesson_plan_dict = None
-
-        if lesson_plan:
-            # Convert Pydantic model to dict for MongoDB storage
-            try:
-                # First try the model_dump method (Pydantic v2)
-                if hasattr(lesson_plan, "model_dump"):
-                    lesson_plan_dict = lesson_plan.model_dump()
-                # Fall back to dict() for Pydantic v1k
-                else:
-                    lesson_plan_dict = lesson_plan.dict()
-            except Exception as e:
-                # If conversion fails, use a string representation
-                lesson_plan_dict = {
-                    "raw_plan": str(lesson_plan),
-                    "conversion_error": str(e)
-                }
-
-        response_data = {
-            "study_id": study_id,
-            "user_id": session_data.get("user_id"),
-            "subject": session_data.get("subject"),
-            "goal": session_data.get("goal"),
-            "level": session_data.get("level"),
-            "lesson_plan": lesson_plan_dict,  # Use the converted dict
-            "grade": result.get("grade"),
-            "feedback": result.get("feedback"),
-            "persona_report_id": persona_report_id,
-            "qa_history_ids": [qa["_id"] for qa in qa_history if "_id" in qa],
-            "curriculum_generated": session_data.get("curriculum", []),
-        }
-        
-        # 7. Save lesson plan to MongoDB
-        try:
-            lesson_plan_id = save_lesson_plan(study_id, response_data)
-            response_data["lesson_plan_id"] = lesson_plan_id
-            print(f"✅ Lesson plan saved with ID: {lesson_plan_id}")
-        except Exception as e:
-            print(f"❌ Error saving lesson plan: {str(e)}")
-            # Continue even if save fails
-            response_data["save_error"] = str(e)
-            
-        return response_data
-        
+        result = generate_and_save_lesson_plan(study_id)
+        return result["response"]
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating lesson plan: {str(e)}")
 
@@ -152,3 +57,42 @@ async def get_lesson_plan(study_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving lesson plan: {str(e)}")
+
+
+
+@router.post("/enqueue/{study_id}")
+async def enqueue_lesson_plan(study_id: str):
+    """
+    Enqueue lesson plan generation job for the given study_id. Idempotent.
+    """
+    job_key = f"lesson_plan:{study_id}"
+
+    existing = generation_jobs.find_one({"job_key": job_key, "type": "lesson_plan"})
+    if existing and existing.get("status") in ("queued", "processing", "claimed", "partial", "ready"):
+        existing["_id"] = str(existing["_id"])
+        return {"job_id": str(existing["_id"]), "status": existing.get("status"), "job": existing}
+
+    # create new job
+    job_doc = {
+        "job_key": job_key,
+        "type": "lesson_plan",
+        "params": {"study_id": study_id},
+        "status": "queued",
+        "progress": 0,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    res = generation_jobs.insert_one(job_doc)
+    return {"job_id": str(res.inserted_id), "status": "queued"}
+
+
+@router.get("/job/{job_id}")
+async def get_job_status(job_id: str):
+    try:
+        job = generation_jobs.find_one({"_id": ObjectId(job_id)})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job["_id"] = str(job["_id"])
+        return job
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

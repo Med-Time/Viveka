@@ -9,7 +9,7 @@ from pymongo.operations import ReplaceOne
 # --- Import your EXISTING database collections ---
 # This is the key part. We use your existing connections.
 try:
-    from interview_module.core.mongo import (
+    from interview_module.interview_core.mongo import (
         db, 
         sessions_col, 
         qa_col, 
