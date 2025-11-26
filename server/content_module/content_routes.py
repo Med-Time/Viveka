@@ -177,7 +177,7 @@ def mark_subtopic_complete(data: ProgressInput):
     update = {
         "$set": {
             f"lesson_plan.chapters.{c_idx}.sub_topics.{s_idx}.completed": True,
-            f"lesson_plan.chapters.{c_idx}.sub_topics.{s_idx}.completed_at": datetime.utcnow()
+            f"lesson_plan.chapters.{c_idx}.sub_topics.{s_idx}.completed_at": datetime.now()
         }
     }
 
@@ -220,8 +220,8 @@ async def enqueue_content_generation(study_id: str, chapter_idx: int, index: int
         "params": {"study_id": study_id, "chapter_idx": chapter_idx, "subtopic_idx": index, "user_id": user_id},
         "status": "queued",
         "progress": 0,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
     }
     res = generation_jobs.insert_one(job_doc)
     return {"job_id": str(res.inserted_id), "status": "queued"}

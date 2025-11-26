@@ -42,7 +42,7 @@ def save_generated_content(data: ContentResponse) -> str:
             "chapter_idx": data.chapter_idx,
             "chapter_title": data.chapter_title,
             "generated_content": [subtopic_doc],
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now()
         }
 
         result = content_col.insert_one(new_doc)

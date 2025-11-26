@@ -89,24 +89,40 @@ def _process_job(job):
             sub = int(params.get("subtopic_idx", 0))
             if generate_and_save_content:
                 res = generate_and_save_content(study_id, ch, sub)
-                # optionally run reference finding (Qdrant-first, web fallback)
+                # optionally run reference finding with context-aware query
                 try:
                     content_text = None
+                    title = None
+                    chapter_title = None
+                    
                     # generated_content in response may be a dict or BaseModel dict
                     gen = res.get("generated_content")
                     if isinstance(gen, dict):
                         content_text = gen.get("content") or gen.get("text")
+                        title = gen.get("title") or gen.get("subtopic_title")
                     else:
-                        # fallback: try key access
+                        # fallback: try key access if gen is dict-like
                         try:
-                            content_text = gen["content"]
+                            if gen and isinstance(gen, dict):
+                                content_text = gen.get("content")
+                                title = gen.get("title")
                         except Exception:
-                            content_text = None
+                            pass
+                    
+                    # get chapter title from response
+                    chapter_title = res.get("chapter_title")
 
                     references = None
                     if find_references and content_text:
                         try:
-                            refs = find_references(content_text)
+                            # Pass title and chapter_title for context-aware search
+                            refs = find_references(
+                                content_text, 
+                                top_k=6, 
+                                min_score=5.0,
+                                title=title,
+                                chapter_title=chapter_title
+                            )
                             if enrich_and_verify:
                                 refs = enrich_and_verify(refs)
                             references = refs

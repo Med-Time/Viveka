@@ -119,8 +119,8 @@ def answer_question(data: AnswerInput):
                     "params": {"study_id": study_id},
                     "status": "queued",
                     "progress": 0,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now(),
                 })
         except Exception:
             # Don't let enqueue errors affect interview response
@@ -137,8 +137,8 @@ def answer_question(data: AnswerInput):
                     "params": {"study_id": study_id, "chapter_idx": 0, "subtopic_idx": 0},
                     "status": "queued",
                     "progress": 0,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
+                    "created_at": datetime.now(),
+                    "updated_at": datetime.now(),
                 })
         except Exception:
             # Don't let enqueue errors affect interview response
@@ -218,7 +218,7 @@ async def finish_interview(study_id: str):
         job_key = f"lesson_plan:{study_id}"
         existing = generation_jobs.find_one({"job_key": job_key, "type": "lesson_plan"})
         if not existing:
-            now = datetime.utcnow()
+            now = datetime.now()
             generation_jobs.insert_one({
                 "job_key": job_key,
                 "type": "lesson_plan",

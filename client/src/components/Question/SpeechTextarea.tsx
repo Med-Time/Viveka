@@ -182,7 +182,7 @@ export const SpeechTextarea: React.FC<Props> = ({
         />
 
         {/* mic button inside textarea (positioned absolute) */}
-        <button
+        <Button
           onClick={toggleRecording}
           type="button"
           aria-pressed={recording}
@@ -199,7 +199,7 @@ export const SpeechTextarea: React.FC<Props> = ({
           <Mic
             className={`h-4 w-4 ${recording ? "text-white animate-pulse" : "text-muted-foreground"}`}
           />
-        </button>
+        </Button>
       </div>
 
       {/* small helper underneath showing interim transcript as word-by-word */}

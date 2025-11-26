@@ -8,7 +8,7 @@ def create_interview_session(user_id, subject, goal, level,curriculum=None):
         "subject": subject,
         "goal": goal,
         "level": level,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now()
     }
     if curriculum:
         session["curriculum"] = curriculum 
@@ -24,7 +24,7 @@ def save_qa(session_id,feedback, concept, question, answer, score, retry):
         "feedback_history": feedback,  # Placeholder for feedback
         "score": score,
         "retry_count": retry,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now()
     })
 
 def save_persona(session_id, report_text, type="interview"):
@@ -32,7 +32,7 @@ def save_persona(session_id, report_text, type="interview"):
     persona_doc = {
         "study_id": session_id,
         "type": type,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now()
     }
     
     # Handle different types of report_text input
@@ -72,7 +72,7 @@ def save_lesson_plan(session_id, lesson_plan_data):
         # Create a new document for the lesson plan
         lesson_plan_doc = {
             "session_id": session_id,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now()
         }
         
         # Add all the data from lesson_plan_data
@@ -105,7 +105,7 @@ def save_study(user_id, study_id, subject):
         {"$push": {"studies": {
             "study_id": study_id,
             "subject": subject,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now()
         }}}
     )
     return 

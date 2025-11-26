@@ -97,3 +97,4 @@ zstandard==0.25.0
 python-multipart==0.0.20
 beautifulsoup4==4.12.3
 ddgs
+reportlab

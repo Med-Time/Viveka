@@ -67,7 +67,7 @@ def generate_and_save_lesson_plan(study_id: str):
         "persona_report_id": persona_report_id,
         "qa_history_ids": [qa["_id"] for qa in qa_history if "_id" in qa],
         "curriculum_generated": session_data.get("curriculum", []),
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now().isoformat(),
     }
 
     # persist

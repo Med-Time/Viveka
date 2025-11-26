@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth.services import get_current_user
 from assignment_module.assignment_routes import router as assignment_router
 from assignment_module.routes.quiz_status_routes import router as quiz_status_router
+from assignment_module.routes import certificate_routes
 from core.job_worker import start_worker, stop_worker
 app = FastAPI() 
 app.include_router(migrate_router)
@@ -18,6 +19,7 @@ app.include_router(lesson_plan_router, dependencies=[Depends(get_current_user)])
 app.include_router(content_router, dependencies=[Depends(get_current_user)])
 app.include_router(assignment_router, dependencies=[Depends(get_current_user)])
 app.include_router(quiz_status_router)
+app.include_router(certificate_routes.router, dependencies=[Depends(get_current_user)])
 app.include_router(assistant_router)
 
 origins = [

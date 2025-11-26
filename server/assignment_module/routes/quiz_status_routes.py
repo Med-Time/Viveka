@@ -52,7 +52,7 @@ async def report_quiz_status(payload: Dict[str, Any]):
             passed = (score_val is not None and score_val >= PASS_THRESHOLD)
 
         job_key = f"quiz_status:{study_id}:{chapter_idx}:{subtopic_idx}"
-        now = datetime.utcnow()
+        now = datetime.now()
 
         doc = {
             "job_key": job_key,

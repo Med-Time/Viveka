@@ -79,8 +79,8 @@ async def enqueue_lesson_plan(study_id: str):
         "params": {"study_id": study_id},
         "status": "queued",
         "progress": 0,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
     }
     res = generation_jobs.insert_one(job_doc)
     return {"job_id": str(res.inserted_id), "status": "queued"}

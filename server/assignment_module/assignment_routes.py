@@ -255,7 +255,7 @@ def submit_assignment(
                     crud.update_assignment_fields(study_id, {
                         status_field: new_status,
                         score_field: score,
-                        updated_at_field: datetime.utcnow()
+                        updated_at_field: datetime.now()
                     })
                 except Exception:
                     # best-effort, do not block response
@@ -269,7 +269,7 @@ def submit_assignment(
                             {"study_id": study_id},
                             {"$set": {
                                 f"lesson_plan.chapters.{chapter_idx}.sub_topics.{subtopic_idx}.completed": True,
-                                f"lesson_plan.chapters.{chapter_idx}.sub_topics.{subtopic_idx}.completed_at": datetime.utcnow()
+                                f"lesson_plan.chapters.{chapter_idx}.sub_topics.{subtopic_idx}.completed_at": datetime.now()
                             }}
                         )
                     except Exception:
@@ -304,8 +304,8 @@ def submit_assignment(
                                 "params": {"study_id": study_id, "chapter_idx": next_ch, "subtopic_idx": next_sub},
                                 "status": "queued",
                                 "progress": 0,
-                                "created_at": datetime.utcnow(),
-                                "updated_at": datetime.utcnow()
+                                "created_at": datetime.now(),
+                                "updated_at": datetime.now()
                             })
                     except Exception:
                         # enqueue is best-effort; ignore failures

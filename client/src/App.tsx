@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { safeGetJson } from "@/utils/storage";
 import AssignmentPage from "./features/assignment/AssignmentPage";
+import { CertificatePage } from "./features/certificate/CertificatePage";
 
 const queryClient = new QueryClient();
 
@@ -111,14 +112,23 @@ export const App = () => {
                   </ProtectedRoute>
                 }
               />
-              {<Route
+              <Route
                 path="/study/:studyId/assignment/:level/:chapterIdx/:subtopicIdx?"
                 element={
                   <ProtectedRoute>
                     <AssignmentPage />
                   </ProtectedRoute>
                 }
-              />}
+              />
+              <Route 
+                path="/certificate/:studyId" 
+                element={
+                  <ProtectedRoute>
+                    <CertificatePage />
+                  </ProtectedRoute>
+                } 
+              />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

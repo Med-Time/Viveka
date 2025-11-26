@@ -66,7 +66,7 @@ def create_user(req: SignupRequest) -> str:
         "interests": req.interests,
         "goals": req.goals,
         "learning_pace": req.learning_pace,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(),
         # containers for tokens
         "refresh_tokens": [],  # list of {token_hash, jti, expires_at, created_at}
         "reset": None,         # {token_hash, expires_at}
@@ -117,7 +117,7 @@ def create_access_token(data: dict, expires_minutes: int = JWT_EXP_MIN):
     if jwt is None:
         raise RuntimeError("pyjwt is required for token generation")
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    expire = datetime.now() + timedelta(minutes=expires_minutes)
     to_encode.update({"exp": expire})
     token = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALG)
     # pyjwt returns str in modern versions
@@ -133,7 +133,7 @@ def create_refresh_token_for_user(user_id: str, days: int = REFRESH_TOKEN_DAYS) 
     jti = secrets.token_hex(8)
     token = secrets.token_urlsafe(64)
     token_hash = _hash_token(token)
-    now = datetime.utcnow()
+    now = datetime.now()
     expires_at = now + timedelta(days=days)
     entry = {
         "jti": jti,
@@ -152,7 +152,7 @@ def verify_refresh_token_and_rotate(refresh_token: str) -> Optional[dict]:
     """
     col = users_collection()
     token_hash = _hash_token(refresh_token)
-    now = datetime.utcnow()
+    now = datetime.now()
     # find user with matching token hash and not expired
     doc = col.find_one({"refresh_tokens.token_hash": token_hash})
     if not doc:
@@ -194,7 +194,7 @@ def create_password_reset_token(email: str) -> str:
         return ""
     token = secrets.token_urlsafe(48)
     token_hash = _hash_token(token)
-    expires_at = datetime.utcnow() + timedelta(hours=RESET_TOKEN_HOURS)
+    expires_at = datetime.now() + timedelta(hours=RESET_TOKEN_HOURS)
     reset_obj = {"token_hash": token_hash, "expires_at": expires_at}
     col.update_one({"_id": doc["_id"]}, {"$set": {"reset": reset_obj}})
     return token
@@ -202,7 +202,7 @@ def create_password_reset_token(email: str) -> str:
 def verify_reset_token(token: str) -> Optional[str]:
     col = users_collection()
     token_hash = _hash_token(token)
-    now = datetime.utcnow()
+    now = datetime.now()
     doc = col.find_one({"reset.token_hash": token_hash})
     if not doc:
         return None

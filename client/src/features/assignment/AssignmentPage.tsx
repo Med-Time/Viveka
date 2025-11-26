@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { SpeechTextarea } from "@/components/Question/SpeechTextarea";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Download, Award } from "lucide-react";
 
-// NEW imports
 import { contentApi } from "@/features/content/content.api";
 import { progressApi } from "@/features/content/progress.api";
 import { lessonPlanApi } from "@/features/lessonPlan/lessonPlan.api";
@@ -27,6 +25,9 @@ export default function AssignmentPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [markingProgress, setMarkingProgress] = useState(false);
+  // NEW: track subtopic/chapter titles
+  const [subtopicTitle, setSubtopicTitle] = useState<string>("");
+  const [chapterTitle, setChapterTitle] = useState<string>("");
 
   // result now includes whether passed and nextRoute for navigation
   const [result, setResult] = useState<
@@ -38,6 +39,9 @@ export default function AssignmentPage() {
       }
     | null
   >(null);
+
+  const [certificateData, setCertificateData] = useState<any>(null);
+  const [downloadingCert, setDownloadingCert] = useState(false);
 
   // NEW helper: enqueue next subtopic generation (idempotent, fire-and-forget)
   const enqueueNextSubtopic = async (studyId: string, cIdx: number, sIdx?: number) => {
@@ -65,7 +69,7 @@ export default function AssignmentPage() {
     }
   };
 
-  // 1. Fetch Questions on Load
+  // 1. Fetch Questions on Load + titles
   useEffect(() => {
     if (!studyId || !level || !chapterIdx) return;
 
@@ -90,6 +94,23 @@ export default function AssignmentPage() {
           });
           setAnswers(existingAnswers);
 
+          // NEW: fetch content to get titles (best-effort)
+          try {
+            const contentResp = await contentApi.get(
+              studyId,
+              parseInt(chapterIdx),
+              subtopicIdx ? parseInt(subtopicIdx) : 0
+            );
+            if (contentResp) {
+              setChapterTitle(contentResp.chapter_title || `Chapter ${chapterIdx}`);
+              setSubtopicTitle(contentResp.title || contentResp.subtopic_title || `Subtopic ${subtopicIdx || 0}`);
+            }
+          } catch (_) {
+            // fallback to defaults
+            setChapterTitle(`Chapter ${chapterIdx}`);
+            setSubtopicTitle(`Subtopic ${subtopicIdx || 0}`);
+          }
+
           if (level === "subtopic") {
             try {
               const sIdxNum = subtopicIdx ? parseInt(subtopicIdx) : 0;
@@ -111,6 +132,19 @@ export default function AssignmentPage() {
   // 2. Handle Answer Change
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
+  };
+
+   const handleSpeechAnswerChange = (
+    questionId: string
+  ) => (update: string | ((prev: string) => string)) => {
+    setAnswers((prev) => {
+      const prevVal = prev[questionId] || "";
+      const nextVal =
+        typeof update === "function"
+          ? (update as (p: string) => string)(prevVal)
+          : update;
+      return { ...prev, [questionId]: nextVal };
+    });
   };
 
   // helper to compute next route (best-effort) but do NOT navigate here
@@ -184,8 +218,17 @@ export default function AssignmentPage() {
         nextRoute,
       });
 
+      
       toast({ title: "Quiz Submitted!", description: `Score: ${response.overall_score}%` });
       window.scrollTo(0, 0);
+      if (passed) {
+        const flagKey = `assignment_generated:${studyId}:${chapterIdx}:${subtopicIdx ? parseInt(subtopicIdx) : 0}`;
+        localStorage.removeItem(flagKey);
+      
+        toast({ title: "Congratulations! You passed the assignment.", description: `Score: ${response.overall_score}%` });
+      } else {
+        toast({ title: "You did not pass the assignment.", description: `Score: ${response.overall_score}%. Please review the lesson and try again.`, variant: "destructive" });
+      }
     } catch (error) {
       console.error(error);
       toast({ title: "Submission failed", variant: "destructive" });
@@ -252,12 +295,40 @@ export default function AssignmentPage() {
     navigate(`/content/${chapterIdx}/${sIdx}`);
   };
 
+  // Fetch certificate after subject capstone passes
+  useEffect(() => {
+    if (result?.passed && level === "subject" && certificateData && studyId) {
+      // Navigate to certificate page instead of showing inline card
+      setTimeout(() => {
+        navigate(`/certificate/${studyId}`);
+      }, 1500); // Small delay to show pass message first
+    }
+  }, [result?.passed, level, studyId]);
+
+  const handleDownloadCertificate = async () => {
+    if (!studyId) return;
+    setDownloadingCert(true);
+    try {
+      await assignmentApi.downloadCertificate(studyId);
+      toast({ title: "Certificate downloaded", description: "Your PDF certificate is ready." });
+    } catch (err) {
+      toast({ title: "Download failed", variant: "destructive" });
+    } finally {
+      setDownloadingCert(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="container max-w-3xl py-8 space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold capitalize">{level} Assignment</h1>
+        <div className="flex-1">
+          <h2 className="text-sm text-muted-foreground mb-2">{chapterTitle}</h2>
+          <h1 className="text-3xl font-bold">
+           Assignment Of {level === "subtopic" ? subtopicTitle : level === "chapter" ? `${chapterTitle} Test` : "Final Capstone"}
+          </h1>
+        </div>
         {result && (
           <div className="text-xl font-bold px-4 py-2 bg-primary/10 rounded-lg">
             Score: {result.score.toFixed(1)}%
@@ -315,10 +386,10 @@ export default function AssignmentPage() {
 
               {q.question_type === "open_ended" && (
                 <SpeechTextarea
-                  placeholder="Write or speak your response here..."
                   value={answers[q.question_id] || ""}
-                  onChange={(v: string) => handleAnswerChange(q.question_id, v)}
+                  onChange={handleSpeechAnswerChange(q.question_id)}
                   disabled={isReadOnly}
+                  placeholder="Write or speak your response here..."
                   className="min-h-[100px]"
                   ariaLabel={`Answer for question ${idx + 1}`}
                 />
@@ -382,6 +453,30 @@ export default function AssignmentPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* NEW: Certificate UI after subject capstone pass */}
+      {result?.passed && level === "subject" && certificateData && (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-700">
+              <Award className="w-6 h-6" />
+              Congratulations! You've Earned a Certificate
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-white rounded-md border border-green-200">
+              <p className="text-sm text-muted-foreground">Certificate of Completion</p>
+              <p className="text-lg font-semibold mt-2">{certificateData.student_name}</p>
+              <p className="text-sm mt-1">Course: <strong>{certificateData.course_title}</strong></p>
+              <p className="text-sm mt-1">Completed: <strong>{new Date(certificateData.completion_date).toLocaleDateString()}</strong></p>
+            </div>
+            <Button onClick={handleDownloadCertificate} disabled={downloadingCert} className="w-full">
+              {downloadingCert ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Download Certificate (PDF)
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
