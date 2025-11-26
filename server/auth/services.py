@@ -1,4 +1,4 @@
-from .core import users_collection
+from core.mongo import user
 from bson import ObjectId
 import os
 from datetime import datetime, timedelta
@@ -54,7 +54,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     return user_id
 
 def create_user(req: SignupRequest) -> str:
-    col = users_collection()
+    col = user
     if col.find_one({"email": req.email.lower()}):
         raise ValueError("User with this email already exists")
     hashed = hash_password(req.password)
@@ -75,7 +75,7 @@ def create_user(req: SignupRequest) -> str:
     return str(res.inserted_id)
 
 def get_user_by_email(email: str):
-    col = users_collection()
+    col = user
     doc = col.find_one({"email": email})
     if not doc:
         return None
@@ -89,7 +89,7 @@ def get_user_by_email(email: str):
     }
 
 def get_user_by_id(user_id: str):
-    col = users_collection()
+    col = user
     try:
         oid = ObjectId(user_id)
     except Exception:
@@ -129,7 +129,7 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 def create_refresh_token_for_user(user_id: str, days: int = REFRESH_TOKEN_DAYS) -> str:
-    col = users_collection()
+    col = user
     jti = secrets.token_hex(8)
     token = secrets.token_urlsafe(64)
     token_hash = _hash_token(token)
@@ -150,7 +150,7 @@ def verify_refresh_token_and_rotate(refresh_token: str) -> Optional[dict]:
     Verify a refresh token, rotate it (remove old, add new), and return new tokens payload:
     { user_id, access_token, refresh_token }
     """
-    col = users_collection()
+    col = user
     token_hash = _hash_token(refresh_token)
     now = datetime.now()
     # find user with matching token hash and not expired
@@ -180,14 +180,14 @@ def verify_refresh_token_and_rotate(refresh_token: str) -> Optional[dict]:
     return {"user_id": user_id, "access_token": access, "refresh_token": new_refresh}
 
 def revoke_refresh_token(refresh_token: str) -> bool:
-    col = users_collection()
+    col = user
     token_hash = _hash_token(refresh_token)
     result = col.update_one({}, {"$pull": {"refresh_tokens": {"token_hash": token_hash}}})
     return result.modified_count > 0
 
 # ---------------- Password reset helpers ----------------
 def create_password_reset_token(email: str) -> str:
-    col = users_collection()
+    col = user
     doc = col.find_one({"email": email})
     if not doc:
         # Do not reveal user existence; return dummy token (caller should still send success)
@@ -200,7 +200,7 @@ def create_password_reset_token(email: str) -> str:
     return token
 
 def verify_reset_token(token: str) -> Optional[str]:
-    col = users_collection()
+    col = user
     token_hash = _hash_token(token)
     now = datetime.now()
     doc = col.find_one({"reset.token_hash": token_hash})
@@ -217,7 +217,7 @@ def confirm_password_reset(token: str, new_password: str) -> bool:
     user_id = verify_reset_token(token)
     if not user_id:
         return False
-    col = users_collection()
+    col = user
     hashed = hash_password(new_password)
     # update password and clear reset tokens and refresh tokens (force re-login)
     col.update_one({"_id": ObjectId(user_id)}, {"$set": {"password": hashed}, "$unset": {"reset": ""}, "$set": {"refresh_tokens": []}})

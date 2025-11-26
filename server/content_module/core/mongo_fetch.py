@@ -1,4 +1,4 @@
-from content_module.core.mongo import content_col
+from core.mongo import content_col
 
 def fetch_content_subtopic(study_id: str, chapter_idx: int, index: int):
     """Fetch the most recent generated content for a session and chapter from MongoDB."""

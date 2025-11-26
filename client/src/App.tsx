@@ -97,7 +97,7 @@ export const App = () => {
                 }
               />
               <Route
-                path="/content/:chapter_idx"
+                path="/content/:chapterSlug"
                 element={
                   <ProtectedRoute>
                     <ContentPage />
@@ -105,7 +105,7 @@ export const App = () => {
                 }
               />
               <Route
-                path="/content/:chapter_idx/:subtopic_idx"
+                path="/content/:chapterSlug/:subtopicSlug"
                 element={
                   <ProtectedRoute>
                     <ContentPage />

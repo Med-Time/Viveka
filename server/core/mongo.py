@@ -16,7 +16,6 @@ except Exception as e:
     print("❌ MongoDB connection error:", e)
 
 db = client["interview_ai"]
-# This is now the only collection you need for interview data
 sessions_col = db["interview_sessions"]
 qa_col = db["qa_history"]
 persona_col = db["persona_reports"]

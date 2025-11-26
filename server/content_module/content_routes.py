@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from content_module.core.mongo import sessions_col, lesson_plans
+from core.mongo import sessions_col, lesson_plan
 from content_module.core.mongo_fetch import fetch_generated_content, fetch_content_subtopic
 from content_module.core.mongo_persistence import save_generated_content
 from content_module.langgraph_flow.content_graph import graph
@@ -125,7 +125,7 @@ async def get_content_references(study_id: str, chapter_idx: int, subtopic_idx: 
     Returns all references from all subtopics in that chapter.
     """
     try:
-        from content_module.core.mongo import content_col
+        from core.mongo import content_col
         
         content = content_col.find_one({
             "study_id": study_id,
@@ -182,7 +182,7 @@ def mark_subtopic_complete(data: ProgressInput):
     }
 
     # Try to update the document
-    result = lesson_plans.update_one(filter_doc, update)
+    result = lesson_plan.update_one(filter_doc, update)
 
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Lesson plan not found for study_id")

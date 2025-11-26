@@ -97,12 +97,8 @@ def _search_google(query: str, top_k: int, api_key: str, cx: str) -> List[Dict[s
             "num": min(top_k, 10),  # Google returns max 10 per request
         }
         resp = requests.get(url, params=params, timeout=10)
-        print(f"Google search API response status: {resp.status_code}")
-        print(f"Google search API response text: {resp.text}")
-        print(f"Google search API response headers: {resp.url}")
         if resp.status_code == 200:
             data = resp.json()
-            print(f"Google search API response data: {data}")
             items = data.get("items", [])
             for i, item in enumerate(items[:top_k]):
                 url_str = item.get("link")
@@ -122,7 +118,6 @@ def _search_google(query: str, top_k: int, api_key: str, cx: str) -> List[Dict[s
                     "verified": verified,
                     "score": score,
                 })
-        print(f"Google search returned {len(results)} results for query: {query}")
     except Exception as e:
         print(f"Google search failed: {e}")
     
@@ -159,7 +154,6 @@ def _search_ddgs(query: str, top_k: int) -> List[Dict[str, Any]]:
                 "verified": verified,
                 "score": score,
             })
-        print(f"DDGS search returned {len(results)} results for query: {query}")
     except Exception as e:
         print(f"DDGS search failed: {e}")
 

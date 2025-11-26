@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from core.mongo import assignments_col, generation_jobs
 
-from content_module.core.mongo import lesson_plans
+from core.mongo import lesson_plan
 from lesson_plan_module.core.mongo_fetch import fetch_lesson_plan
 
 router = APIRouter(prefix="/quiz-status", tags=["quiz-status"])
@@ -79,7 +79,7 @@ async def report_quiz_status(payload: Dict[str, Any]):
         if passed:
             # mark lesson plan subtopic complete (best-effort)
             try:
-                lesson_plans.update_one(
+                lesson_plan.update_one(
                     {"study_id": study_id},
                     {
                         "$set": {

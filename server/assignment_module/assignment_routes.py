@@ -4,7 +4,7 @@ from typing import Dict, Any
 from bson import ObjectId
 from datetime import datetime
 from core.mongo import user, generation_jobs
-from content_module.core.mongo import lesson_plans
+from core.mongo import lesson_plan
 from lesson_plan_module.core.mongo_fetch import fetch_lesson_plan
 
 from .assignment_schema import (
@@ -265,7 +265,7 @@ def submit_assignment(
                 if passed:
                     try:
                         # mark lesson plan subtopic completed (if lesson_plan exists)
-                        lesson_plans.update_one(
+                        lesson_plan.update_one(
                             {"study_id": study_id},
                             {"$set": {
                                 f"lesson_plan.chapters.{chapter_idx}.sub_topics.{subtopic_idx}.completed": True,

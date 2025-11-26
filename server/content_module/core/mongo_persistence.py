@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from content_module.core.mongo import content_col
+from core.mongo import content_col
 from content_module.schemas import ContentResponse
 from datetime import datetime
 

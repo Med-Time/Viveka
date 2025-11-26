@@ -1,7 +1,7 @@
 from bson import ObjectId
 from datetime import datetime
 
-from content_module.core.mongo import sessions_col
+from core.mongo import sessions_col
 from content_module.langgraph_flow.content_graph import graph
 from content_module.core.mongo_persistence import save_generated_content
 from content_module.schemas import ContentInput, ContentResponse

@@ -9,7 +9,7 @@ from interview_module.services.mongo_persistence import (
     save_persona,
     save_study
 )
-from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
+from core.mongo import sessions_col, persona_col, qa_col
 from bson import ObjectId
 from core.mongo import generation_jobs
 from datetime import datetime

@@ -60,12 +60,20 @@ export const OnboardingPage = () => {
     return;
   }
 
+  const clean = (s: string) => s.trim().replace(/\s+/g, " ");
+  const toTitleCase = (s: string) =>
+    clean(s)
+      .toLowerCase()
+      .replace(/\b([a-z])/g, (_m, ch) => ch.toUpperCase());
+
+  const processedCourse = toTitleCase(data.course);
+
   const payload: StartInterviewRequest = {
     user_id: userId,
-    subject: data.course,
-    goal: data.specificGoals,
+    subject: processedCourse,
+    goal: clean(data.specificGoals),
     level: data.difficulty,
-    prior_knowledge: data.priorKnowledge,
+    prior_knowledge: clean(data.priorKnowledge),
     hours_per_week: data.hoursPerWeek,
   };
 

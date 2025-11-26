@@ -1,4 +1,4 @@
-from interview_module.interview_core.mongo import sessions_col, qa_col, persona_col, lesson_plans_col, users_collection
+from core.mongo import sessions_col, qa_col, persona_col, lesson_plan, user
 from datetime import datetime
 from bson import ObjectId
 
@@ -93,14 +93,14 @@ def save_lesson_plan(session_id, lesson_plan_data):
             return str(existing_plan["_id"])
         else:
             # Insert new plan
-            result = lesson_plans_col.insert_one(lesson_plan_doc)
+            result = lesson_plan.insert_one(lesson_plan_doc)
             return str(result.inserted_id)
     except Exception as e:
         print(f"Exception in save_lesson_plan: {str(e)}")
         raise
 
 def save_study(user_id, study_id, subject):
-    users_collection.update_one(
+    user.update_one(
         {"_id": ObjectId(user_id)},
         {"$push": {"studies": {
             "study_id": study_id,

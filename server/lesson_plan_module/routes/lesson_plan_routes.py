@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from bson import ObjectId
-from lesson_plan_module.core.mongo import sessions_col, persona_col, qa_col
+from core.mongo import sessions_col, persona_col, qa_col
 from lesson_plan_module.core.mongo_fetch import fetch_lesson_plan
 from interview_module.services.mongo_persistence import save_lesson_plan
 from lesson_plan_module.langraph_flow.lesson_plan import xlesson_plan_graph

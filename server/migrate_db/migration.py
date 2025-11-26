@@ -9,12 +9,12 @@ from pymongo.operations import ReplaceOne
 # --- Import your EXISTING database collections ---
 # This is the key part. We use your existing connections.
 try:
-    from interview_module.interview_core.mongo import (
+    from core.mongo import (
         db, 
         sessions_col, 
         qa_col, 
         persona_col,
-        lesson_plans_col as lesson_plan_col
+        lesson_plan as lesson_plan_col
     )
     # from lesson_plan_module.core.mongo import (
     #     lesson_plan as lesson_plan_col

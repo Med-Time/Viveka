@@ -5,7 +5,7 @@ from .schemas import (
     RefreshRequest, RefreshResponse, LogoutRequest
 )
 from . import services
-from typing import Dict
+from fastapi import Form
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -30,8 +30,6 @@ def login(req: LoginRequest):
     return TokenResponse(access_token=token, user=user_out), {"refresh_token": refresh}
 
 
-# In routes.py
-from fastapi import Form
 
 @router.post("/login-swagger")
 def login_swagger(username: str = Form(...), password: str = Form(...)):
@@ -40,16 +38,6 @@ def login_swagger(username: str = Form(...), password: str = Form(...)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = services.create_access_token({"sub": user["id"], "email": user["email"]})
     return {"access_token": token, "token_type": "bearer"}
-
-# NOTE: above login returned a tuple; better to return combined response
-# @router.post("/login2", response_model=RefreshResponse)
-# def login2(req: LoginRequest):
-#     user = services.authenticate_user(req.email.lower(), req.password)
-#     if not user:
-#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-#     access = services.create_access_token({"sub": user["id"], "email": user["email"]})
-#     refresh = services.create_refresh_token_for_user(user["id"])
-#     return RefreshResponse(access_token=access, refresh_token=refresh)
 
 # Refresh endpoint - rotates refresh token and returns new access+refresh
 @router.post("/refresh", response_model=RefreshResponse)

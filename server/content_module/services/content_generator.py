@@ -1,6 +1,6 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 import dotenv
-from content_module.core.mongo import db, sessions_col, persona_col, lesson_plans, content_col
+from core.mongo import persona_col, lesson_plan, content_col
 import threading
 
 dotenv.load_dotenv()
@@ -18,27 +18,23 @@ def _cache_key(study_id, chapter_title, subtopic_title):
 def fetch_persona_and_lesson(study_id, user_id=None):
     """Fetch persona report and lesson plan from MongoDB for a given study_id (and optional user_id)."""
     # Fetch persona report
-    print(f"Fetching persona for study_id: {study_id}")
     query = {"study_id": study_id}
     # if user_id:
     #     query["user_id"] = user_id
     persona = persona_col.find_one(query)
     if not persona:
         raise ValueError("Persona report not found for study_id")
-    print(f"Fetched persona for study_id: {study_id}")
     # Fetch lesson plan
-    lesson_plan = lesson_plans.find_one(query)
-    if not lesson_plan:
+    lesson_plans = lesson_plan.find_one(query)
+    if not lesson_plans:
         raise ValueError("Lesson plan not found for study_id")
-    
-    print(f"Fetched lesson plan for study_id: {study_id}")
 
     # Remove MongoDB's _id field if present
     persona.pop("_id", None)
-    lesson_plan.pop("_id", None)
+    lesson_plans.pop("_id", None)
 
-    return persona, lesson_plan
-
+    return persona, lesson_plans
+    
 
 def get_subtopic(lesson_plan, chapter_idx=0, subtopic_idx=0):
     """Retrieve subtopics for a given chapter index from the lesson plan."""

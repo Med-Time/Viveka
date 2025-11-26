@@ -5,13 +5,12 @@ import { AppHeader } from "@/components/Layout/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LessonPlanList } from "@/components/Plan/LessonPlanList";
-// ADDED: Lock icon import
 import { BookOpen, Lock } from "lucide-react"; 
 import { lessonPlanApi } from "./lessonPlan.api";
-
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { safeGetJson } from "@/utils/storage";
+import { slugify } from "@/utils/slug";
 
 export const LessonPlanPage = () => {
   const navigate = useNavigate();
@@ -178,9 +177,45 @@ export const LessonPlanPage = () => {
     generateMutation.mutate();
   };
 
+  const navigateToContent = (chapterIdx: number, subtopicIdx: number = 0) => {
+    // If we have a lesson plan with titles, use them to build slugs
+    if (
+      lessonPlan &&
+      lessonPlan.lesson_plan &&
+      Array.isArray(lessonPlan.lesson_plan.chapters)
+    ) {
+      const chapters = lessonPlan.lesson_plan.chapters as any[];
+      const chapter = chapters[chapterIdx];
+
+      const chapterTitle =
+        chapter?.chapter_title || `Chapter ${chapterIdx + 1}`;
+
+      const subtopicTitle =
+        chapter?.sub_topics?.[subtopicIdx]?.sub_topic_title ||
+        `Subtopic ${subtopicIdx + 1}`;
+
+      const chapterSlug = encodeURIComponent(slugify(chapterTitle));
+      const subtopicSlug = encodeURIComponent(slugify(subtopicTitle));
+
+      if (!localStorage.getItem("current_study_id") && currentStudyId) {
+        localStorage.setItem("current_study_id", currentStudyId);
+      }
+
+      navigate(`/content/${chapterSlug}/${subtopicSlug}`);
+      return;
+    }
+
+    // Fallback: old numeric URL if for some reason lessonPlan is missing
+    navigate(`/content/${chapterIdx}/${subtopicIdx}`);
+  };
+  const handleGoToSubtopic = (chapterIdx: number, subtopicIdx: number) => {
+    navigateToContent(chapterIdx, subtopicIdx);
+  };
+
   const handleStartChapter = (chapterIdx: number) => {
     if (!lessonPlan) {
-      navigate(`/content/${chapterIdx}/0`);
+      // fallback - no plan yet
+      navigateToContent(chapterIdx, 0);
       return;
     }
 
@@ -188,18 +223,16 @@ export const LessonPlanPage = () => {
     const chapter = chapters[chapterIdx];
 
     if (!chapter || !Array.isArray(chapter.sub_topics) || chapter.sub_topics.length === 0) {
-      navigate(`/content/${chapterIdx}/0`);
+      navigateToContent(chapterIdx, 0);
       return;
     }
 
+    // first unfinished, else last
     const firstUncompleted = chapter.sub_topics.findIndex((st: any) => !Boolean(st.completed));
-    const targetSubtopicIdx = firstUncompleted === -1 ? chapter.sub_topics.length - 1 : firstUncompleted;
+    const targetSubtopicIdx =
+      firstUncompleted === -1 ? chapter.sub_topics.length - 1 : firstUncompleted;
 
-    if (!localStorage.getItem("current_study_id") && currentStudyId) {
-      localStorage.setItem("current_study_id", currentStudyId);
-    }
-
-    navigate(`/content/${chapterIdx}/${targetSubtopicIdx}`);
+    navigateToContent(chapterIdx, targetSubtopicIdx);
   };
 
   if ((!hasGenerated && !isLoading) || isGenerating || (hasGenerated && !lessonPlan)) {
@@ -275,7 +308,11 @@ export const LessonPlanPage = () => {
           </p>
         </div>
 
-        <LessonPlanList items={lessonPlan.lesson_plan.chapters} onStartChapter={handleStartChapter} />
+        <LessonPlanList 
+        items={lessonPlan.lesson_plan.chapters} 
+        onStartChapter={handleStartChapter} 
+        onStartSubtopic={handleGoToSubtopic}
+        />
 
         {/* --- UPDATED CAPSTONE PROJECT BUTTON SECTION --- */}
         <div className={`mt-12 p-8 border rounded-lg text-center transition-all duration-200 ${isCourseComplete ? "bg-muted/30" : "bg-muted/10 opacity-75"}`}>

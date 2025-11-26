@@ -8,6 +8,8 @@ from core.mongo import generation_jobs
 from core.mongo import generated_content_col
 from bson import ObjectId
 
+from assignment_module.core.assignment_generation import generate_and_save_assignment
+
 # try to import helpers used by worker; fall back to graph-level invocation if helpers missing
 try:
     from lesson_plan_module.core.generation import generate_and_save_lesson_plan
@@ -139,6 +141,25 @@ def _process_job(job):
                             )
                         except Exception:
                             pass
+
+                    time.sleep(10)  # brief pause before assignment step
+                    # Generate assignment after content generation
+                    _update_job_progress(job_id, progress=75)
+                    try:
+                        if generate_and_save_assignment:
+                            assignment_res = generate_and_save_assignment(
+                                study_id=study_id,
+                                chapter_idx=ch,
+                                subtopic_idx=sub
+                            )
+                            print(f"Assignment generated: {assignment_res}")
+                    except Exception as assign_err:
+                        print(f"Warning: Assignment generation failed for {study_id}:{ch}:{sub} - {str(assign_err)}")
+
+                    _finish_job_success(job_id, {
+                        "content_id": res.get("content_id"),
+                        "assignment_generated": True
+                    })
 
                 except Exception:
                     # non-fatal: continue even if reference step fails
