@@ -5,8 +5,10 @@ import { AppHeader } from "@/components/Layout/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LessonPlanList } from "@/components/Plan/LessonPlanList";
-import { BookOpen, Lock } from "lucide-react"; 
+import { BookOpen, Lock } from "lucide-react";
 import { lessonPlanApi } from "./lessonPlan.api";
+import { certificateApi } from "@/features/certificate/certificate.api";
+
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/hooks/use-toast";
 import { safeGetJson } from "@/utils/storage";
@@ -83,6 +85,7 @@ export const LessonPlanPage = () => {
   const study_id = currentStudyId;
   const [hasGenerated, setHasGenerated] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [hasCertificate, setHasCertificate] = useState(false);
 
   // First: check whether a lesson plan already exists for this study.
   useEffect(() => {
@@ -131,6 +134,35 @@ export const LessonPlanPage = () => {
       mounted = false;
     };
   }, [study_id]);
+
+  useEffect(() => {
+    if (!study_id) return;
+
+    let mounted = true;
+
+    (async () => {
+      try {
+        // Assumes certificateApi.get(study_id) returns meta like { certificate_id, ... }
+        // If your method name is different, adjust here.
+        const cert = await certificateApi.certificateExists(study_id);
+        if (!mounted) return;
+
+        if (cert && cert.certificate_id) {
+          setHasCertificate(true);
+        } else {
+          setHasCertificate(false);
+        }
+      } catch (err) {
+        // If 404 or error -> no certificate yet
+        if (mounted) setHasCertificate(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [study_id]);
+
 
   const queryClient = useQueryClient();
 
@@ -292,11 +324,9 @@ export const LessonPlanPage = () => {
   }
 
   // --- NEW LOGIC: Check if ALL chapters and subtopics are completed ---
-  const isCourseComplete = lessonPlan.lesson_plan.chapters.every((chapter: any) => 
+  const isCourseComplete = lessonPlan.lesson_plan.chapters.every((chapter: any) =>
     chapter.sub_topics?.every((st: any) => Boolean(st.completed))
   );
-  // ------------------------------------------------------------------
-
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
@@ -308,41 +338,71 @@ export const LessonPlanPage = () => {
           </p>
         </div>
 
-        <LessonPlanList 
-        items={lessonPlan.lesson_plan.chapters} 
-        onStartChapter={handleStartChapter} 
-        onStartSubtopic={handleGoToSubtopic}
+        <LessonPlanList
+          items={lessonPlan.lesson_plan.chapters}
+          onStartChapter={handleStartChapter}
+          onStartSubtopic={(chapterTitle: string, subtopicTitle: string) => {
+            const chapters = lessonPlan.lesson_plan.chapters || [];
+            const chapterIdx = chapters.findIndex((ch: any) => ch.chapter_title === chapterTitle);
+            const chapter = chapters[chapterIdx];
+            const subtopicIdx = chapter?.sub_topics?.findIndex((st: any) => st.sub_topic_title === subtopicTitle) ?? 0;
+            if (chapterIdx !== -1) {
+              handleGoToSubtopic(chapterIdx, subtopicIdx);
+            }
+          }}
         />
 
-        {/* --- UPDATED CAPSTONE PROJECT BUTTON SECTION --- */}
-        <div className={`mt-12 p-8 border rounded-lg text-center transition-all duration-200 ${isCourseComplete ? "bg-muted/30" : "bg-muted/10 opacity-75"}`}>
+        {/* --- CAPSTONE / CERTIFICATE SECTION --- */}
+        <div
+          className={`mt-12 p-8 border rounded-lg text-center transition-all duration-200 ${isCourseComplete ? "bg-muted/30" : "bg-muted/10 opacity-75"
+            }`}
+        >
           <div className="flex items-center justify-center gap-2 mb-4">
             <h2 className="text-2xl font-bold">
-              {isCourseComplete ? "🎉 Course Completion" : "🔒 Final Exam locked"}
+              {hasCertificate
+                ? "🎓 Course Completed"
+                : isCourseComplete
+                  ? "🎉 Capstone Unlocked"
+                  : "🔒 Final Exam Locked"}
             </h2>
           </div>
-          
+
           <p className="text-muted-foreground mb-6">
-            {isCourseComplete 
-              ? "Ready to prove your mastery? Take the final comprehensive subject exam."
-              : "Complete all chapters and subtopics above to unlock the final Subject exam."}
+            {hasCertificate
+              ? "You’ve completed the course and earned your certificate. You can view it anytime."
+              : isCourseComplete
+                ? "You’ve completed all chapters. Take the final comprehensive subject exam to earn your certificate."
+                : "Complete all chapters and subtopics above to unlock the final subject exam."}
           </p>
 
-          <Button 
-            size="lg" 
-            disabled={!isCourseComplete}
-            className={`w-full md:w-auto ${isCourseComplete ? "bg-purple-600 hover:bg-purple-700" : ""}`}
-            onClick={() => {
-              if (!isCourseComplete) return;
-              // Navigate to Subject Assignment
-              navigate(`/study/${study_id}/assignment/subject/0/0`);
-            }}
-          >
-            {!isCourseComplete && <Lock className="mr-2 h-4 w-4" />}
-            Start Capstone Project
-          </Button>
+          {hasCertificate ? (
+            <Button
+              size="lg"
+              className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => {
+                if (!study_id) return;
+                navigate(`/certificate/${study_id}`);
+              }}
+            >
+              View Certificate
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              disabled={!isCourseComplete}
+              className={`w-full md:w-auto ${isCourseComplete ? "bg-purple-600 hover:bg-purple-700" : ""
+                }`}
+              onClick={() => {
+                if (!isCourseComplete) return;
+                // Navigate to Subject Assignment (capstone)
+                navigate(`/study/${study_id}/assignment/subject/0/0`);
+              }}
+            >
+              {!isCourseComplete && <Lock className="mr-2 h-4 w-4" />}
+              Start Capstone Project
+            </Button>
+          )}
         </div>
-        {/* ----------------------------------- */}
 
       </div>
     </div>

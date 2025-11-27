@@ -173,9 +173,14 @@ All colors MUST be HSL.
   @apply text-2xl font-semibold mt-5 mb-2 text-foreground;
 }
 
-.prose p {
+/* .prose p {
   @apply my-4 leading-7;
+} */
+
+.prose p {
+  margin-top: 0 !important;
 }
+
 
 .prose ul, .prose ol {
   @apply my-4 ml-6;

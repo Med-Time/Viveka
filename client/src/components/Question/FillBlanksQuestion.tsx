@@ -55,7 +55,7 @@ export const FillBlanksQuestion = ({
                 <Input
                   id={`${id}-blank-${idx}`}
                   className="inline-block mx-2 w-40"
-                  placeholder={`Blank ${idx + 1}`}
+                  placeholder={`Answer`}
                   value={answers[idx] || ""}
                   onChange={(e) => handleChange(idx, e.target.value)}
                   disabled={disabled}

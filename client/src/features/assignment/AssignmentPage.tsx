@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SpeechTextarea } from "@/components/Question/SpeechTextarea";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle2, XCircle, Download, Award } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Award } from "lucide-react";
 
 import { contentApi } from "@/features/content/content.api";
 import { progressApi } from "@/features/content/progress.api";
@@ -17,6 +17,7 @@ import { lessonPlanApi } from "@/features/lessonPlan/lessonPlan.api";
 import { safeGetJson } from "@/utils/storage";
 import { slugify } from "@/utils/slug";
 import { certificateApi } from "../certificate/certificate.api";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 export default function AssignmentPage() {
   const { studyId, level, chapterIdx, subtopicIdx } = useParams();
@@ -35,19 +36,20 @@ export default function AssignmentPage() {
   // result now includes whether passed and nextRoute for navigation
   const [result, setResult] = useState<
     | {
-        score: number;
-        feedback: QuestionFeedback[];
-        passed: boolean;
-        nextRoute?: string | null;
-      }
+      score: number;
+      feedback: QuestionFeedback[];
+      passed: boolean;
+      nextRoute?: string | null;
+    }
     | null
   >(null);
 
-  const [certificateData, setCertificateData] = useState<any>(null);
-  const [downloadingCert, setDownloadingCert] = useState(false);
-
   // enqueue next subtopic generation (idempotent, fire-and-forget)
-  const enqueueNextSubtopic = async (studyId: string, cIdx: number, sIdx?: number) => {
+  const enqueueNextSubtopic = async (
+    studyId: string,
+    cIdx: number,
+    sIdx?: number
+  ) => {
     try {
       const lp = await lessonPlanApi.get(studyId).catch(() => null);
       let nextChapter = cIdx;
@@ -57,7 +59,9 @@ export default function AssignmentPage() {
         const chapters = lp.lesson_plan.chapters;
         const chapter = chapters[cIdx];
         const totalSub =
-          chapter && Array.isArray(chapter.sub_topics) ? chapter.sub_topics.length : 0;
+          chapter && Array.isArray(chapter.sub_topics)
+            ? chapter.sub_topics.length
+            : 0;
         if (nextSubtopic >= totalSub) {
           nextChapter = cIdx + 1;
           nextSubtopic = 0;
@@ -67,7 +71,9 @@ export default function AssignmentPage() {
         else nextSubtopic = 0;
       }
 
-      void contentApi.enqueue(studyId, nextChapter, nextSubtopic).catch(() => null);
+      void contentApi
+        .enqueue(studyId, nextChapter, nextSubtopic)
+        .catch(() => null);
     } catch {
       // ignore
     }
@@ -76,6 +82,10 @@ export default function AssignmentPage() {
   // 1. Fetch Questions on Load + titles
   useEffect(() => {
     if (!studyId || !level || chapterIdx == null) return;
+
+    setResult(null);
+    setAnswers({});
+    setQuestions([]);
 
     const fetchQuiz = async () => {
       try {
@@ -102,14 +112,13 @@ export default function AssignmentPage() {
 
           // Fetch content to get titles (best-effort)
           try {
-            // For chapter test or subject, using subtopic 0 is fine for title
             const contentResp = await contentApi.get(studyId, cIdx, sIdx);
             if (contentResp) {
               setChapterTitle(contentResp.chapter_title || `Chapter ${chapterIdx}`);
               setSubtopicTitle(
                 contentResp.title ||
-                  contentResp.subtopic_title ||
-                  `Subtopic ${subtopicIdx || 0}`
+                contentResp.subtopic_title ||
+                `Subtopic ${subtopicIdx || 0}`
               );
             }
           } catch {
@@ -154,7 +163,6 @@ export default function AssignmentPage() {
     };
 
   // helper to compute next route (best-effort) but do NOT navigate here
-  // NOW returns a **slug-based content URL** when going to next subtopic
   const computeNextRoute = async () => {
     if (!studyId || !chapterIdx) return null;
     try {
@@ -169,7 +177,9 @@ export default function AssignmentPage() {
       if (lp && lp.lesson_plan && Array.isArray(lp.lesson_plan.chapters)) {
         const chapter = lp.lesson_plan.chapters[cIdx];
         totalSub =
-          chapter && Array.isArray(chapter.sub_topics) ? chapter.sub_topics.length : 0;
+          chapter && Array.isArray(chapter.sub_topics)
+            ? chapter.sub_topics.length
+            : 0;
       }
 
       if (totalSub === 0) {
@@ -252,9 +262,8 @@ export default function AssignmentPage() {
       window.scrollTo(0, 0);
 
       if (passed) {
-        const flagKey = `assignment_generated:${studyId}:${chapterIdx}:${
-          subtopicIdx ? parseInt(subtopicIdx, 10) : 0
-        }`;
+        const flagKey = `assignment_generated:${studyId}:${chapterIdx}:${subtopicIdx ? parseInt(subtopicIdx, 10) : 0
+          }`;
         localStorage.removeItem(flagKey);
 
         toast({
@@ -264,8 +273,7 @@ export default function AssignmentPage() {
       } else {
         toast({
           title: "You did not pass the assignment.",
-          description:
-            `Score: ${response.overall_score}%. Please review the lesson and try again.`,
+          description: `Score: ${response.overall_score}%. Please review the lesson and try again.`,
           variant: "destructive",
         });
       }
@@ -333,9 +341,9 @@ export default function AssignmentPage() {
 
   // Handler to review lesson (go back to content for the SAME subtopic using slugs)
   const handleReviewLesson = () => {
-    // Build slugs from titles (this does NOT depend on assignment URL structure)
     const chapterBase =
-      chapterTitle || (chapterIdx != null ? `Chapter ${chapterIdx}` : "chapter");
+      chapterTitle ||
+      (chapterIdx != null ? `Chapter ${chapterIdx}` : "chapter");
     const subtopicBase =
       subtopicTitle ||
       (subtopicIdx != null ? `Subtopic ${subtopicIdx}` : "subtopic");
@@ -346,30 +354,11 @@ export default function AssignmentPage() {
     navigate(`/content/${chapterSlug}/${subtopicSlug}`);
   };
 
-  // Subject-level certificate redirect
-  useEffect(() => {
-    if (result?.passed && level === "subject" && certificateData && studyId) {
-      setTimeout(() => {
-        navigate(`/certificate/${studyId}`);
-      }, 1500);
-    }
-  }, [result?.passed, level, studyId, certificateData, navigate]);
-
-  const handleDownloadCertificate = async () => {
-    if (!studyId) return;
-    setDownloadingCert(true);
-    try {
-      await certificateApi.downloadCertificate(studyId);
-      toast({
-        title: "Certificate downloaded",
-        description: "Your PDF certificate is ready.",
-      });
-    } catch (err) {
-      toast({ title: "Download failed", variant: "destructive" });
-    } finally {
-      setDownloadingCert(false);
-    }
-  };
+  const isLastSubtopicToChapter =
+    level === "subtopic" &&
+    result?.nextRoute?.startsWith(
+      studyId ? `/study/${studyId}/assignment/chapter/` : ""
+    );
 
   if (loading)
     return (
@@ -388,8 +377,8 @@ export default function AssignmentPage() {
             {level === "subtopic"
               ? subtopicTitle
               : level === "chapter"
-              ? `${chapterTitle} Test`
-              : "Final Capstone"}
+                ? `${chapterTitle} Test`
+                : "Final Capstone"}
           </h1>
         </div>
         {result && (
@@ -418,9 +407,9 @@ export default function AssignmentPage() {
           >
             <CardHeader>
               <CardTitle className="text-lg font-medium flex gap-3">
-                <span className="opacity-50">{idx + 1}.</span>
+                <span className="opacity-100">{idx + 1}.</span>
                 <div className="flex-1">
-                  {q.question_text}
+                  <MarkdownRenderer content={q.question_text} />
                   {qFeedback && (
                     <div className="mt-2 flex items-center gap-2 text-sm font-normal">
                       {qFeedback.is_correct ? (
@@ -452,6 +441,7 @@ export default function AssignmentPage() {
                         value={opt.id}
                         id={`${q.question_id}-${opt.id}`}
                       />
+                      {/* you can also make options markdown if needed */}
                       <Label htmlFor={`${q.question_id}-${opt.id}`}>
                         {opt.text}
                       </Label>
@@ -485,15 +475,13 @@ export default function AssignmentPage() {
               {qFeedback && (
                 <div className="mt-4 p-4 bg-muted/50 rounded-md text-sm">
                   <p className="font-semibold">Feedback:</p>
-                  <p>{qFeedback.feedback}</p>
+                  <MarkdownRenderer content={qFeedback.feedback} />
                   {!qFeedback.is_correct && (
                     <div className="mt-2 pt-2 border-t border-border/50">
                       <p className="font-semibold text-muted-foreground">
                         Explanation:
                       </p>
-                      <p className="text-muted-foreground">
-                        {q.explanation}
-                      </p>
+                      <MarkdownRenderer content={q.explanation} />
                     </div>
                   )}
                 </div>
@@ -526,97 +514,126 @@ export default function AssignmentPage() {
             <p className="mt-1">
               Score: <strong>{result.score.toFixed(1)}%</strong>
             </p>
+
             {result.passed ? (
               <p className="mt-2 text-green-700">
-                Congratulations — you passed! You can proceed to the next
-                subtopic.
+                {level === "subject"
+                  ? "Amazing — you passed the final capstone!"
+                  : isLastSubtopicToChapter
+                    ? "Great job! Now take the chapter test to consolidate your learning."
+                    : "Congratulations — you passed! You can proceed to the next subtopic."}
               </p>
             ) : (
               <p className="mt-2 text-red-700">
-                You did not pass. We recommend reviewing the lesson and trying
-                again.
+                {level === "subject"
+                  ? "You did not pass the final exam. Please review the course and try again."
+                  : "You did not pass. We recommend reviewing the lesson and trying again."}
               </p>
             )}
           </div>
 
-          <div className="flex gap-3">
-            {result.passed ? (
-              <Button
-                onClick={handleNextSubtopic}
-                disabled={markingProgress}
-                size="lg"
-                className="flex-1"
-              >
-                {markingProgress ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Next Subtopic
-              </Button>
-            ) : null}
-
-            <Button
-              variant="outline"
-              onClick={handleReviewLesson}
-              className="flex-1"
-              size="lg"
-            >
-              Review Lesson
-            </Button>
-
-            <Button
-              variant="ghost"
-              onClick={() => navigate(-1)}
-              className="w-28"
-            >
-              Back
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Certificate UI for subject level (optional) */}
-      {result?.passed && level === "subject" && certificateData && (
-        <Card className="border-green-200 bg-green-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-700">
-              <Award className="w-6 h-6" />
-              Congratulations! You've Earned a Certificate
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-white rounded-md border border-green-200">
-              <p className="text-sm text-muted-foreground">
-                Certificate of Completion
-              </p>
-              <p className="text-lg font-semibold mt-2">
-                {certificateData.student_name}
-              </p>
-              <p className="text-sm mt-1">
-                Course: <strong>{certificateData.course_title}</strong>
-              </p>
-              <p className="text-sm mt-1">
-                Completed:{" "}
-                <strong>
-                  {new Date(
-                    certificateData.completion_date
-                  ).toLocaleDateString()}
-                </strong>
-              </p>
-            </div>
-            <Button
-              onClick={handleDownloadCertificate}
-              disabled={downloadingCert}
-              className="w-full"
-            >
-              {downloadingCert ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          {/* Actions differ for subject vs other levels */}
+          {level === "subject" ? (
+            <div className="flex flex-wrap gap-3">
+              {result.passed ? (
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  onClick={() => studyId && navigate(`/certificate/${studyId}`)}
+                >
+                  <Award className="mr-2 h-5 w-5" />
+                  View Certificate
+                </Button>
               ) : (
-                <Download className="mr-2 h-4 w-4" />
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleReviewLesson}
+                    className="flex-1"
+                    size="lg"
+                  >
+                    Review Course
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (!studyId) return;
+                      const chapterPart = chapterIdx ?? "0";
+                      navigate(`/study/${studyId}/assignment/subject/${chapterPart}`);
+                    }}
+                    className="flex-1"
+                    size="lg"
+                  >
+                    Retake Final Exam
+                  </Button>
+                </>
               )}
-              Download Certificate (PDF)
-            </Button>
-          </CardContent>
-        </Card>
+
+              <Button
+                variant="ghost"
+                onClick={() => navigate(-1)}
+                className="w-28"
+              >
+                Back
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              {result.passed && (
+                <Button
+                  onClick={async () => {
+                    if (level === "chapter") {
+                      // Navigate to first subtopic of next chapter
+                      const nextChapter = parseInt(chapterIdx!, 10) + 1;
+                      const lp = await lessonPlanApi.get(studyId).catch(() => null);
+                      if (lp?.lesson_plan?.chapters?.[nextChapter]) {
+                        const nextCh = lp.lesson_plan.chapters[nextChapter];
+                        const chSlug = encodeURIComponent(slugify(nextCh.chapter_title));
+                        const subSlug = encodeURIComponent(slugify(nextCh.sub_topics?.[0]?.sub_topic_title || "Subtopic 1"));
+                        navigate(`/content/${chSlug}/${subSlug}`);
+                      } else {
+                        // last chapter → go to subject test
+                        navigate(`/study/${studyId}/assignment/subject/${chapterIdx}`);
+                      }
+
+                      return;
+                    }
+                    // otherwise just reuse existing handler
+                    await handleNextSubtopic();
+                  }}
+                  disabled={markingProgress}
+                  size="lg"
+                  className="flex-1"
+                >
+                  {markingProgress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+
+                  {level === "chapter"
+                    ? "Next Chapter"
+                    : isLastSubtopicToChapter
+                      ? "Take Chapter Test"
+                      : "Next Subtopic"}
+                </Button>
+              )}
+
+
+              <Button
+                variant="outline"
+                onClick={handleReviewLesson}
+                className="flex-1"
+                size="lg"
+              >
+                Review Lesson
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={() => navigate(-1)}
+                className="w-28"
+              >
+                Back
+              </Button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

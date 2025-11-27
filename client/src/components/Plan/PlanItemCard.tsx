@@ -11,7 +11,6 @@ interface PlanItemCardProps {
   index: number;
   isLocked?: boolean;
   onStart: () => void;
-  // 🔁 CHANGE: pass titles, not indices
   onStartSubtopic: (chapterTitle: string, subtopicTitle: string) => void;
 }
 
@@ -157,7 +156,6 @@ export const PlanItemCard = ({
                       className={buttonVariants({ variant: "ghost" }) + " mt-3"}
                       onClick={(e) => {
                         e.stopPropagation();
-                        // 🔁 send titles up; parent will slugify
                         onStartSubtopic(
                           item.chapter_title,
                           subTopic.sub_topic_title

@@ -149,11 +149,14 @@ export function CertificatePage() {
   if (error || !certificate) {
     return (
       <div className="min-h-screen flex flex-col">
-        {/* Header */}
         <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-primary" />
+              <img
+                src="/logo.png"
+                alt="Viveka logo"
+                className="h-7 w-7 object-contain"
+              />
               <span className="text-xl font-bold">Viveka</span>
             </Link>
 
@@ -206,7 +209,11 @@ export function CertificatePage() {
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" />
+            <img
+              src="/logo.png"
+              alt="Viveka logo"
+              className="h-7 w-7 object-contain"
+            />
             <span className="text-xl font-bold">Viveka</span>
           </Link>
 

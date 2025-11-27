@@ -14,4 +14,9 @@ export const certificateApi = {
     );
     return response.data;
   },
+  
+  certificateExists: async (studyId: string): Promise<{ exists: boolean; certificate_id: string | null }> => {
+    const response = await axiosClient.get(`/certificate/${studyId}/exists`);
+    return response.data;
+  },
 };

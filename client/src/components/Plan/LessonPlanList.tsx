@@ -6,9 +6,10 @@ import { slugify } from "@/utils/slug";
 interface ChapterListProps {
   items: Chapter[];
   onStartChapter: (chapterIdx: number) => void;
+  onStartSubtopic: (chapterTitle: string, subtopicTitle: string) => void;
 }
 
-export const LessonPlanList = ({ items, onStartChapter }: ChapterListProps) => {
+export const LessonPlanList = ({ items, onStartChapter, onStartSubtopic }: ChapterListProps) => {
   const navigate = useNavigate();
 
   // A chapter is complete only if ALL its subtopics are marked completed

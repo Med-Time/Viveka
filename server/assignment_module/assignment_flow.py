@@ -215,11 +215,11 @@ def score_answers(state: AssignmentState) -> AssignmentState:
         feedback = ""
         score = 0.0
         
-        if q_type in ["mcq", "fill_in_blank"]:
+        if q_type == "mcq":
             is_correct = (str(user_res.user_answer).lower() == str(gt_question["correct_answer"]).lower())
             score = 10.0 if is_correct else 0.0
             feedback = "Correct!" if is_correct else f"Incorrect. {gt_question['explanation']}"
-        elif q_type == "open_ended":
+        elif q_type in  ["open_ended", "fill_in_blank"]:
             try:
                 grade = grader_chain.invoke({
                     "question": gt_question["question_text"],

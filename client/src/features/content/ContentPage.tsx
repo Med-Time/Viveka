@@ -426,6 +426,7 @@ export const ContentPage = () => {
       });
       return;
     }
+    handleComplete();
     try {
       enqueueNextForNavigation();
     } catch {

@@ -181,3 +181,18 @@ async def download_certificate(study_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{study_id}/exists")
+async def certificate_exists(study_id: str):
+    """
+    Check if a certificate already exists for the given study.
+    Returns boolean flag.
+    """
+    try:
+        cert = db["certificates"].find_one({"study_id": study_id})
+        return {
+            "exists": cert is not None,
+            "certificate_id": str(cert["_id"]) if cert else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
