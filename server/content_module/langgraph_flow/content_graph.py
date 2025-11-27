@@ -70,7 +70,7 @@ def content_graph():
     builder.add_edge("fetch_images", "ValidateContent") 
     # Fetch -> Evaluate
     # Edges
-    builder.add_edge("GenerateContent", "ValidateContent")
+    # builder.add_edge("GenerateContent", "ValidateContent")
 
     builder.add_conditional_edges(
         "ValidateContent",
