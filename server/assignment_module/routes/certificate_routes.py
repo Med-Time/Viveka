@@ -29,7 +29,7 @@ async def get_certificate(study_id: str):
         if test['status'] != "completed":
             raise HTTPException(status_code=400, detail="Certificate can only be generated after completing all assignments")
         
-        if test['overall_score'] < 70:
+        if test['overall_score'] < 60:
             raise HTTPException(status_code=400, detail="Certificate can only be generated after passing the capstone assignment")
         
         student = db["users"].find_one({"_id": ObjectId(userId)})
