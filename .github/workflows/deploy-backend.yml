@@ -26,25 +26,31 @@ jobs:
           git checkout -b main
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
+          
+          # --- FIX START: Enable Git LFS ---
+          git lfs install
+          git lfs track "*.png"
+          git lfs track "*.jpg"
+          git lfs track "*.jpeg"
+          git lfs track "*.ico"
+          # ---------------------------------
 
           # Copy server contents
           cp -r ../server/* ./
           cp -r ../server/.* ./ 2>/dev/null || true
 
           # --- FIX: REMOVE LARGE PREPROCESSING FILES ---
-          # This deletes the specific PDF or the whole preprocessing folder
-          # so it doesn't get pushed to Hugging Face.
           rm -rf preprocessing
           # ---------------------------------------------
 
-          # Create .dockerignore (Good practice)
+          # Create .dockerignore
           echo "__pycache__" > .dockerignore
           echo "*.pyc" >> .dockerignore
           echo ".git" >> .dockerignore
           echo ".github" >> .dockerignore
           echo "venv" >> .dockerignore
           
-          # Ensure README exists
+          # Ensure README exists (your existing code...)
           if [ ! -f README.md ]; then
             echo "---" > README.md
             echo "title: Viveka Backend" >> README.md
@@ -62,6 +68,7 @@ jobs:
             exit 1
           fi
 
+          # Add .gitattributes (created by lfs track) and all other files
           git add .
           git commit -m "Deploy backend from GitHub @ $(date)"
 
