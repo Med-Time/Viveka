@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END
 from content_module.langgraph_flow.nodes.content_generator import generate_content_node
 from content_module.langgraph_flow.nodes.content_evaluator import validate_content_node
 from content_module.schemas import ContentInput
+from content_module.langgraph_flow.nodes.image_agent import fetch_images_node
 
 
 # ---------------- Routing Helper ----------------
@@ -62,10 +63,12 @@ def content_graph():
     builder.add_node("GenerateContent", generate_content_node)
     builder.add_node("ValidateContent", validate_content_node)
     builder.add_node("CheckRetries", check_retry_limit)
-
+    builder.add_node("fetch_images", fetch_images_node)
     # Entry
     builder.set_entry_point("GenerateContent")
-
+    builder.add_edge("GenerateContent", "fetch_images") # Generate -> Fetch
+    builder.add_edge("fetch_images", "ValidateContent") 
+    # Fetch -> Evaluate
     # Edges
     builder.add_edge("GenerateContent", "ValidateContent")
 
@@ -87,6 +90,7 @@ def content_graph():
             "stop": END,
         },
     )
+    # builder.add_edge("fetch_images", END)
 
     return builder.compile()
 
