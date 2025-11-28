@@ -1,7 +1,8 @@
+import dotenv
 from interview_module.interview_core.vector_Store import search_similar_chunks
 from langchain_google_genai import ChatGoogleGenerativeAI
 import random
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_INTERVIEW"))
 from pydantic import BaseModel, Field
 from typing import List
 question_variations = [

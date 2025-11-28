@@ -1,3 +1,4 @@
+import dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
@@ -7,7 +8,7 @@ import json
 import re
 
 # Initialize LLM with lower temperature for more consistent evaluations
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1)
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1, api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_INTERVIEW"))
 
 class LessonPlanEvaluation(BaseModel):
     """Structured evaluation of a lesson plan."""

@@ -1,3 +1,4 @@
+import dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate
@@ -7,7 +8,7 @@ from typing import Any, Optional
 import time
 
 # Initialize Evaluator LLM
-_eval_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1)
+_eval_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1, api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_LESSON_PLAN"))
 _eval_parser = PydanticOutputParser(pydantic_object=ContentEvaluation)
 
 EVAL_PROMPT = """
