@@ -4,9 +4,9 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Literal, Union
-
+import os
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_INTERVIEW"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv( "GOOGLE_API_KEY_INTERVIEW"))
 
 # Define Pydantic models for structured output
 class SubTopic(BaseModel):

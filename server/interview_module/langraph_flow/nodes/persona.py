@@ -23,8 +23,8 @@ class PersonaSummary(BaseModel):
     engagement_and_confidence: str = Field(..., description="Describe the learner's observable engagement level and confidence throughout the interview based on their responses and tone (if discernible).")
     actionable_learning_recommendations: List[str] = Field(..., description="Specific, actionable recommendations for how the learner should approach future study, what types of resources would be most effective (e.g., more practice problems, re-reading theoretical explanations, watching videos, hands-on labs), and strategies to overcome identified weaknesses. These should be directly useful for a lesson plan.")
     preliminary_personalized_roadmap_suggestions: List[str] = Field(..., description="A suggested sequence of 3-5 high-level topics or chapters (more granular than the initial curriculum concepts) that should be prioritized in their personalized lesson plan to address weaknesses and build on strengths, leading towards their overall goal. These should be highly specific, e.g., 'Mastering Python Dictionaries: Advanced Methods'.")
-
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=dotenv.get_key(".env", "GOOGLE_API_KEY"))
+import os
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os.getenv( "GOOGLE_API_KEY"))
 structured_llm = llm.with_structured_output(PersonaSummary)
 
 def run_persona(state):

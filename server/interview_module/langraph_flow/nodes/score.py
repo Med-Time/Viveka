@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 from pydantic import BaseModel, Field
 from typing import List
-
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_INTERVIEW"))
+import os
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os.getenv( "GOOGLE_API_KEY_INTERVIEW"))
 
 class ScoreEvaluation(BaseModel):
     score: int = Field(..., ge=0, le=100, description="Score between 0 and 100 for the user's last answer, reflecting accuracy and completeness.")

@@ -3,7 +3,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 load_dotenv()
 import random
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_INTERVIEW"))
+import os
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os.getenv( "GOOGLE_API_KEY_INTERVIEW"))
 from pydantic import BaseModel, Field
 from typing import List
 question_variations = [

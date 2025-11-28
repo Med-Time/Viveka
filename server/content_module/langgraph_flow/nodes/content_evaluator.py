@@ -6,9 +6,9 @@ from content_module.services.content_generator import fetch_persona_and_lesson
 from content_module.schemas import ContentEvaluation, SubtopicEvaluation
 from typing import Any, Optional
 import time
-
+import os
 # Initialize Evaluator LLM
-_eval_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1, api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_LESSON_PLAN"))
+_eval_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1, google_api_key=os.getenv( "GOOGLE_API_KEY_LESSON_PLAN"))
 _eval_parser = PydanticOutputParser(pydantic_object=ContentEvaluation)
 
 EVAL_PROMPT = """

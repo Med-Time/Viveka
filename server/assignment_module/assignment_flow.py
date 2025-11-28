@@ -1,3 +1,4 @@
+import os
 import uuid
 from typing import TypedDict, List, Dict, Any, Optional
 import dotenv
@@ -37,7 +38,7 @@ class AssignmentState(TypedDict):
 
 def get_llm():
     # Ensure GOOGLE_API_KEY is in your environment variables
-    return ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_ASSIGNMENT"))
+    return ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv( "GOOGLE_API_KEY_ASSIGNMENT"))
 
 # --- 3. Define Graph Nodes ---
 

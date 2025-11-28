@@ -1,3 +1,4 @@
+import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 import dotenv
 from core.mongo import persona_col, lesson_plan, content_col
@@ -70,7 +71,7 @@ def get_subtopic(lesson_plan, chapter_idx=0, subtopic_idx=0):
 def generate_content(persona, lesson_plan, subtopic, chapter_title, chapter_index, feedback=None):
     """Generate content using Google Gemini model based on persona, lesson plan, and subtopic."""
     # Using a slightly more creative temperature for good explanations, but low enough for accuracy
-    agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.15, api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_CONTENT"))
+    agent = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.15, google_api_key=os.getenv( "GOOGLE_API_KEY_CONTENT"))
 
     prompt = f"""
         You are an expert educational content creator. 

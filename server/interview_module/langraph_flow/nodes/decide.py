@@ -2,12 +2,12 @@ import dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-
+import os
 class NextAction(BaseModel):
     action: str = Field(..., description='Action to take: "retry", "next", or "end"')
     reason: str = Field(..., description="Brief explanation for the decision")
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=dotenv.get_key(".env", "GOOGLE_API_KEY_INTERVIEW"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os.getenv( "GOOGLE_API_KEY_INTERVIEW"))
 structured_llm = llm.with_structured_output(NextAction)
 
 def decide_next(state):
